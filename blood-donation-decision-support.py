@@ -27,7 +27,7 @@ selected = st.sidebar.radio(
         "🏠 Overview",
         "📊 Exploratory Analysis",
         "🤖 Modeling & Recommendations"
-    ]
+    ])
 
 # Dummy data generator
 @st.cache_data
