@@ -54,7 +54,7 @@ if selected == "Introduction":
     st.title("🩸 Blood Donation Decision Support System")
     st.image(
         "https://cdn.pixabay.com/photo/2017/02/01/12/41/donation-2025392_960_720.png",
-        caption="Donate Blood, Save Lives"
+        caption="Donate Blood, Save Lives", width = 700
     )
     st.markdown(
         """
