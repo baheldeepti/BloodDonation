@@ -288,16 +288,7 @@ elif selected == "🤖 Modeling & Recommendations":
     ax_cm.set(title=f"Confusion Matrix: {best}", xlabel='Pred', ylabel='Actual')
     st.subheader("🔍 Confusion Matrix")
     st.pyplot(fig_cm)
-        # 11) AI insights
-    st.subheader("🤖 AI Insights & Next Steps")
-    prompt = (
-        "Senior data scientist with 20 yrs exp. Given:\n\n"
-        f"{df_res.to_csv(index=False)}\n\n"
-        f"ConfMatrix({best}): {cm.tolist()}\n\n"
-        "Recommend best model, improvements, next steps."
-    )
-    st.info(get_gpt_insight(prompt))
-
+ 
 
     # 11) New data & recommendations
     st.subheader("🔄 Data Input & Personalized Recommendations")
@@ -331,4 +322,13 @@ elif selected == "🤖 Modeling & Recommendations":
             out[f'Value_{name}']=(prob*150).round(2)
         st.subheader("📋 Recommendations"); st.dataframe(out)
         st.download_button("Download CSV", out.to_csv(index=False), "recs.csv","text/csv")
+    # 11) AI insights
+    st.subheader("🤖 AI Insights & Next Steps")
+    prompt = (
+        "Senior data scientist with 20 yrs exp. Given:\n\n"
+        f"{df_res.to_csv(index=False)}\n\n"
+        f"ConfMatrix({best}): {cm.tolist()}\n\n"
+        "Recommend best model, improvements, next steps."
+    )
+    st.info(get_gpt_insight(prompt))
 
