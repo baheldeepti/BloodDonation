@@ -31,7 +31,9 @@ selected = st.sidebar.radio(
     options=[
         "🏠 Overview",
         "📊 Exploratory Analysis",
-        "🤖 Modeling & Recommendations"
+        "🤖 Modeling & Recommendations",
+         "📈 Budget Optimization"]
+)
     ])
 
 # Dummy data generator
