@@ -256,83 +256,94 @@ elif selected == "Decision Support":
 elif selected == "Decision Support":
     st.title("💼 Decision Support System")
 
+    # 1) make sure we have models from page 3
     trained_models = st.session_state.get('trained_models', {})
-    scaler = st.session_state.get('scaler', None)
-    feats = st.session_state.get('features', [])
+    scaler         = st.session_state.get('scaler', None)
+    feats          = st.session_state.get('features', [])
 
     if not trained_models or scaler is None or not feats:
         st.warning("Please run the Predictive Modeling page first.")
+        st.stop()
+
+    # 2) let the user pick which model(s) to apply
+    models_sel = st.multiselect(
+        "Select model(s) to use for prediction",
+        options=list(trained_models.keys()),
+        default=list(trained_models.keys())
+    )
+
+    st.markdown("---\n### ① Provide new donor data\n")
+
+    # 3a) file uploader
+    uploaded_file = st.file_uploader("Upload donor data CSV", type="csv")
+
+    # 3b) manual‐entry form
+    if 'manual_entries' not in st.session_state:
+        st.session_state['manual_entries'] = []
+
+    with st.form("manual_entry_form", clear_on_submit=True):
+        r = st.number_input('Recency (months since last donation)', min_value=0, max_value=50, value=10)
+        f = st.number_input('Frequency (total donations)',      min_value=1, max_value=10, value=2)
+        m = st.number_input('Monetary (mL donated)',           min_value=0, max_value=2000, value=500)
+        t = st.number_input('Time (months since first donation)', min_value=1, max_value=100, value=12)
+        a = st.number_input('Age (years)',                     min_value=18, max_value=100, value=35)
+        c = st.selectbox('Responded to campaign?', ['Yes', 'No'])
+        submitted = st.form_submit_button("Add Entry")
+        if submitted:
+            st.session_state['manual_entries'].append({
+                'Recency': r,
+                'Frequency': f,
+                'Monetary': m,
+                'Time': t,
+                'Age': a,
+                'CampaignResponse': 1 if c == 'Yes' else 0
+            })
+            st.success("✅ Entry added")
+
+    # 4) build the DataFrame from either source
+    if uploaded_file is not None:
+        df_in = pd.read_csv(uploaded_file)
     else:
-        # Model selection
-        models_sel = st.multiselect(
-            "Select model(s)",
-            options=list(trained_models.keys()),
-            default=list(trained_models.keys())
-        )
-        
-        # Data input: CSV or manual multiple entries
-        uploaded_file = st.file_uploader("Upload donor data CSV", type='csv')
-        if uploaded_file:
-            df_in = pd.read_csv(uploaded_file)
-        else:
-            if 'manual_entries' not in st.session_state:
-                st.session_state['manual_entries'] = []
-            with st.form(key='manual_entry_form'):
-                r = st.number_input('Recency', 0, 50, 10)
-                f = st.number_input('Frequency', 1, 10, 2)
-                m = st.number_input('Monetary (mL)', 250, 1250, 500)
-                t = st.number_input('Time', 1, 100, 12)
-                a = st.number_input('Age', 18, 65, 35)
-                c = st.selectbox('Responded to campaign?', ['Yes', 'No'])
-                submitted = st.form_submit_button('Add Entry')
-                if submitted:
-                    st.session_state['manual_entries'].append({
-                        'Recency': r,
-                        'Frequency': f,
-                        'Monetary': m,
-                        'Time': t,
-                        'Age': a,
-                        'CampaignResponse': 1 if c == 'Yes' else 0
-                    })
-            df_in = pd.DataFrame(st.session_state['manual_entries'])
+        df_in = pd.DataFrame(st.session_state['manual_entries'])
 
-        # —————— Normalise & validate column names ——————
-        # strip spaces so ' Monetary ' still works
-        df_in.rename(columns=lambda x: x.strip(), inplace=True)
+    # 5) if there's still no data, prompt and stop before error
+    if df_in.empty:
+        st.info("👉 Please upload a CSV **or** add at least one manual entry above.")
+        st.stop()
 
-        required_cols = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age', 'CampaignResponse']
-        missing = [c for c in required_cols if c not in df_in.columns]
-        if missing:
-            st.error(f"❌ Missing column(s): {', '.join(missing)}. "
-                     "Please upload a CSV with headers exactly: "
-                     "Recency, Frequency, Monetary, Time, Age, CampaignResponse.")
-            st.stop()
+    # 6) tidy up column names & validate
+    df_in.rename(columns=lambda x: x.strip(), inplace=True)
+    required = ['Recency','Frequency','Monetary','Time','Age','CampaignResponse']
+    missing  = [c for c in required if c not in df_in.columns]
+    if missing:
+        st.error(f"❌ Missing column(s): {', '.join(missing)}")
+        st.error("Your data must have headers: " + ", ".join(required))
+        st.stop()
 
-        # —————— RE-COMPUTE ENGINEERED FEATURES ——————
-        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
-        df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
+    # 7) engineer features & predict
+    df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
+    df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
 
-        # Display input and predictions as before
-        st.subheader("🔢 Input Data")
-        st.dataframe(df_in)
+    st.subheader("🔢 Input Data")
+    st.dataframe(df_in)
 
-        # Scale & predict
-        X_input = scaler.transform(df_in[feats])
-        out = df_in.copy()
-        for name in models_sel:
-            model = trained_models[name]
-            prob = model.predict_proba(X_input)[:, 1]
-            rec = np.where(prob > 0.7, 'SMS Campaign',
-                   np.where(prob > 0.4, 'Email Reminder', 'Deprioritize'))
-            out[f'Prob_{name}']  = np.round(prob, 3)
-            out[f'Rec_{name}']   = rec
-            out[f'Value_{name}'] = np.round(prob * 150, 2)
+    X_input = scaler.transform(df_in[feats])
+    out     = df_in.copy()
+    for name in models_sel:
+        model = trained_models[name]
+        prob  = model.predict_proba(X_input)[:,1]
+        rec   = np.where(prob > 0.7, 'SMS Campaign',
+                 np.where(prob > 0.4, 'Email Reminder', 'Deprioritize'))
+        out[f'Prob_{name}']  = np.round(prob,3)
+        out[f'Rec_{name}']   = rec
+        out[f'Value_{name}'] = np.round(prob * 150,2)
 
-        st.subheader("📋 Recommendations")
-        st.dataframe(out)
-        st.download_button(
-            "📥 Download Recommendations",
-            out.to_csv(index=False),
-            file_name='donor_recommendations.csv',
-            mime='text/csv'
-        )
+    st.subheader("📋 Recommendations")
+    st.dataframe(out)
+
+    st.download_button(
+        "📥 Download Recommendations",
+        out.to_csv(index=False),
+        file_name='donor_recommendations.csv',
+        mime='text/csv'
+    )
