@@ -132,12 +132,7 @@ elif selected == "📊 Exploratory Analysis":
                       title='Frequency vs Monetary by Repeat Donation')
     st.plotly_chart(fig6, use_container_width=True)
 
-        # Numeric distributions
-    st.subheader("📈 Numeric Distributions")
-    cols = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age']
-    for col in cols:
-        fig = px.histogram(df, x=col, title=f"Distribution of {col}")
-        st.plotly_chart(fig, use_container_width=True)
+
 
     # AI insights
     st.subheader("💡 AI-Generated Insights")
@@ -317,12 +312,22 @@ elif selected == "🤖 Modeling & Recommendations":
         out = df_new.copy()
         for name, mdl in trained.items():
             prob = mdl.predict_proba(Xn)[:,1]
-            rec  = np.where(prob>0.7,'SMS','Email','Deprioritize')
-            out[f'Prob_{name}']=prob.round(3)
-            out[f'Rec_{name}']=rec
-            out[f'Value_{name}']=(prob*150).round(2)
-        st.subheader("📋 Recommendations"); st.dataframe(out)
-        st.download_button("Download CSV", out.to_csv(index=False), "recs.csv","text/csv")
+        # ---- FIXED HERE ----
+        conditions = [
+            prob > 0.7,
+            (prob > 0.4) & (prob <= 0.7)
+        ]
+        choices = ['SMS', 'Email']
+        rec = np.select(conditions, choices, default='Deprioritize')
+        # ---------------------
+
+        out[f'Prob_{name}']   = np.round(prob, 3)
+        out[f'Rec_{name}']    = rec
+        out[f'Value_{name}']  = np.round(prob * 150, 2)
+
+    st.subheader("📋 Recommendations")
+    st.dataframe(out)
+    st.download_button("Download CSV", out.to_csv(index=False), "recs.csv","text/csv")
     # 11) AI insights
     st.subheader("🤖 AI Insights & Next Steps")
     prompt = (
