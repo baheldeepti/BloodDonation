@@ -53,7 +53,7 @@ def get_gpt_insight(prompt: str) -> str:
     return resp.choices[0].message.content.strip()
 
 # --- PAGE 1: INTRODUCTION ---
-if selected == "Introduction":
+if selected == "🏠 Overview":
     st.title("🩸 Blood Donation Decision Support System")
     st.image(
         "https://news-notes.ufhealth.org/files/2020/02/foweb_blood_donation_art_pg26.jpg",
@@ -84,7 +84,7 @@ if selected == "Introduction":
     )
 
 # --- PAGE 2: EXPLORATORY ANALYSIS ---
-elif selected == "Exploratory Analysis":
+elif selected == "📊 Exploratory Analysis":
     st.title("📊 Exploratory Data Analysis")
     df = generate_data()
 
@@ -148,7 +148,7 @@ elif selected == "Exploratory Analysis":
     st.info(ins)
 
 # --- PAGE: MODELING & DECISION SUPPORT ---
-elif selected == "Modeling & Decision Support":
+elif selected == "🤖 Modeling & Recommendations":
     st.title("🔍 Modeling & Decision Support")
     st.markdown(
         """
