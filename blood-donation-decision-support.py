@@ -409,7 +409,7 @@ elif selected == "📈 Budget Optimization":
         )
 
         # ➤ Feature engineering (same as modeling page)
-        df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+        df_in["Monetary_per_Freq"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
         df_in["Intensity"] = df_in["Frequency"] / (df_in["Recency"] + 1)
 
         # ➤ Pick trained model
