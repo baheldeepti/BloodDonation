@@ -478,8 +478,7 @@ elif selected == "📈 Budget Optimization":
             "You are a nonprofit fundraising strategist.\n"
             "Given the following optimization table (with columns Recency, Frequency, ... "
             f"and Contact, Expected Return):\n\n{df_opt.to_csv(index=False)}\n\n"
-            "Provide three concise, non-technical recommendations "
-            "on how to adjust outreach strategy for better ROI."
+            "Provide the explanation and impact of result and recommendations."
         )
         insight = get_gpt_insight(ai_prompt)
         st.info(insight)
