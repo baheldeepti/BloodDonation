@@ -362,6 +362,9 @@ elif selected == "📈 Budget Optimization":
 
         model_name = st.selectbox("Choose model", list(models.keys()))
         model = models[model_name]
+        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
+        df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
+
         X_opt = scaler.transform(df_in[feats])
         p_i = model.predict_proba(X_opt)[:,1]
         df_opt = df_in.copy()
