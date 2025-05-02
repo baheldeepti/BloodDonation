@@ -22,9 +22,12 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 # Navigation menu using Streamlit's native radio buttons
 st.sidebar.title("Navigation")
 selected = st.sidebar.radio(
-    label="Go to", 
-    options=["Introduction", "Exploratory Analysis", "Predictive Modeling and Recommendations"]
-)
+    label="Go to",
+    options=[
+        "🏠 Overview",
+        "📊 Exploratory Analysis",
+        "🤖 Modeling & Recommendations"
+    ]
 
 # Dummy data generator
 @st.cache_data
