@@ -2,12 +2,7 @@
 
 ## Problem Statement
 
-Blood banks and healthcare organizations need to identify and engage repeat donors efficiently to ensure a stable blood supply. Manual processes and generic outreach often miss high‑value donors or waste resources on unlikely donors. This application provides an AI‑powered decision support system to:
-
-* Predict which donors are most likely to give again
-* Forecast monthly donation volumes
-* Recommend personalized outreach strategies
-* Quantify expected cost savings per donor segment
+Blood banks and healthcare organizations seek to efficiently allocate outreach resources to maximize repeat donations while minimizing marketing effort. Generic campaigns waste budget on unlikely donors, whereas targeted outreach can yield higher returns. We formulate an optimization problem to decide which donors to target under a budget constraint.
 
 ## Data Source
 
@@ -66,6 +61,44 @@ All data displayed and modeled in this app is **synthetically generated** to sim
 * **Exploratory Analysis**: Interactive charts, KPI metrics, correlation heatmap, and AI insights
 * **Predictive Modeling**: Feature pipeline, model training & hyperparameter tuning, performance comparison, and GPT recommendations
 * **Decision Support**: Donor data input, multi‑model predictions, outreach decisions, cost‑savings analysis, and CSV export
+
+## Optimization Problem Formulation
+
+We define an integer programming problem:
+
+**Decision Variables**:
+
+* $x_i \in \{0,1\}$: binary indicator, 1 if donor $i$ is selected for campaign outreach
+
+**Parameters**:
+
+* $p_i$: predicted probability that donor $i$ will donate again (from ML models)
+* $v$: monetary value saved per successful donation (USD)
+* $c_i$: cost of contacting donor $i$ (e.g., SMS, email, phone)
+* $B$: total marketing budget (USD)
+
+**Objective**:
+
+$$
+\max_{x} \sum_i x_i \;(p_i \times v) \quad - \quad \sum_i x_i \;c_i
+$$
+
+Maximize expected net savings = expected donation value minus outreach costs.
+
+**Constraint**:
+
+$$
+\sum_i x_i \;c_i \le B
+$$
+
+Total contact cost must not exceed budget $B$.
+
+**Additional Constraints** (optional):
+
+* Limit number of SMS vs email campaigns: $\sum_{i\in SMS} x_i \le S_{max},$
+* Minimum expected donations target: $\sum_i x_i \;p_i \ge D_{min}$
+
+By solving this optimization, blood banks can allocate their outreach budget to the donors with the highest expected return on investment.
 
 ---
 
