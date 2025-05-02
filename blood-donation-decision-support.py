@@ -53,7 +53,7 @@ def get_gpt_insight(prompt: str) -> str:
 if selected == "Introduction":
     st.title("🩸 Blood Donation Decision Support System")
     st.image(
-        "https://cdn.pixabay.com/photo/2017/02/01/12/41/donation-2025392_960_720.png",
+        "https://images.app.goo.gl/QVAQxQ4EFBcssNHcA",
         caption="Donate Blood, Save Lives", width = 700
     )
     st.markdown(
@@ -85,12 +85,7 @@ elif selected == "Exploratory Analysis":
     st.title("📊 Exploratory Data Analysis")
     df = generate_data()
 
-    # Numeric distributions
-    st.subheader("📈 Numeric Distributions")
-    cols = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age']
-    for col in cols:
-        fig = px.histogram(df, x=col, title=f"Distribution of {col}")
-        st.plotly_chart(fig, use_container_width=True)
+
 
     # KPI summary
     st.subheader("📌 KPI Summary")
@@ -133,10 +128,17 @@ elif selected == "Exploratory Analysis":
                       title='Frequency vs Monetary by Repeat Donation')
     st.plotly_chart(fig6, use_container_width=True)
 
+        # Numeric distributions
+    st.subheader("📈 Numeric Distributions")
+    cols = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age']
+    for col in cols:
+        fig = px.histogram(df, x=col, title=f"Distribution of {col}")
+        st.plotly_chart(fig, use_container_width=True)
+
     # AI insights
     st.subheader("💡 AI-Generated Insights")
     prompt = (
-        "Generate key insights from a blood donation dataset with columns: Recency, Frequency, Monetary, "
+        "Act as a Data Analyst and Generate key insights from a blood donation dataset with columns: Recency, Frequency, Monetary, "
         "Time, Age, CampaignResponse, Target, based on observed distributions and correlations."
     )
     ins = get_gpt_insight(prompt)
@@ -207,10 +209,11 @@ elif selected == "Predictive Modeling":
     # Display model comparison
     st.subheader("📋 Model Comparison")
     results_df = pd.DataFrame(results)
-    styled_df = results_df.style.background_gradient(subset=['AUC'], cmap='Greens') \
-                           .highlight_max(axis=0, color='lightgreen') \
-                           .highlight_min(axis=0, color='salmon')
+    results_df['Recommended'] = ['*' if i==0 else '' for i in results_df.index]
+    metric_cols = ['AUC','Accuracy','F1 Score','Precision','Recall']
+    styled_df = results_df.style         .background_gradient(subset=metric_cols, cmap='Greens')        .highlight_max(subset=metric_cols, color='lightgreen')         .highlight_min(subset=metric_cols, color='salmon')
     st.dataframe(styled_df)
+ 
 
     # Display ROC curves
     st.subheader("📉 ROC Curves")
@@ -275,10 +278,14 @@ elif selected == "Decision Support":
                     })
             df_in = pd.DataFrame(st.session_state['manual_entries'])
 
+        # --- RE-COMPUTE ENGINEERED FEATURES ---
+        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
+        df_in['Intensity'] = df_in['Frequency'] / (df_in['Recency'] + 1)
+
         st.subheader("🔢 Input Data")
         st.dataframe(df_in)
 
-        # Predictions & recommendations
+        # Scale & predict
         X_input = scaler.transform(df_in[feats])
         out = df_in.copy()
         for name in models_sel:
@@ -298,3 +305,4 @@ elif selected == "Decision Support":
             file_name='donor_recommendations.csv',
             mime='text/csv'
         )
+   
