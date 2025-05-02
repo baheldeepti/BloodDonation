@@ -475,10 +475,14 @@ elif selected == "📈 Budget Optimization":
         # ➤ AI-Generated Strategy Insights
         st.subheader("6. AI-Generated Strategy Insights")
         ai_prompt = (
-            "You are a nonprofit fundraising strategist.\n"
-            "Given the following optimization table (with columns Recency, Frequency, ... "
-            f"and Contact, Expected Return):\n\n{df_opt.to_csv(index=False)}\n\n"
-            "Provide the explanation and impact of result and recommendations in a way even a non technical person can understand. Make it more conversational and easy to comprehend"
+            "You are a nonprofit fundraising strategist reviewing the donor optimization results below:\n\n"
+            f"{df_opt.to_csv(index=False)}\n\n"
+            "Please present your analysis in three clearly labeled sections:\n"
+            "1. **Key Findings:** 2–3 bullet points summarizing the most important insights.\n"
+            "2. **What This Means:** A brief, non-technical explanation of how these results impact our outreach strategy.\n"
+            "3. **Recommendations:** 2–3 actionable, easy-to-understand steps we should take next.\n"
+            "Write in a conversational style that anyone on the team can follow."
         )
+
         insight = get_gpt_insight(ai_prompt)
         st.info(insight)
