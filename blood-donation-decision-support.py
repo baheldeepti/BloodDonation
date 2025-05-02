@@ -209,7 +209,7 @@ elif selected == "Predictive Modeling":
     # Display model comparison
     st.subheader("📋 Model Comparison")
     results_df = pd.DataFrame(results)
-    results_df['Recommended'] = ['*' if i==0 else '' for i in results_df.index]
+    #results_df['Recommended'] = ['*' if i==0 else '' for i in results_df.index]
     metric_cols = ['AUC','Accuracy','F1 Score','Precision','Recall']
     styled_df = results_df.style         .background_gradient(subset=metric_cols, cmap='Greens')        .highlight_max(subset=metric_cols, color='lightgreen')         .highlight_min(subset=metric_cols, color='salmon')
     st.dataframe(styled_df)
@@ -225,7 +225,7 @@ elif selected == "Predictive Modeling":
 
     # GPT recommendation
     st.subheader("🤖 GPT-3.5 Recommendation")
-    prompt = "Given this model comparison table, recommend the best model." + results_df.to_csv(index=False)
+    prompt = "Act as data analyst and Given this model comparison table, recommend the best model and give appropriate recommendations for next steps and impact" + results_df.to_csv(index=False)
     recommendation = get_gpt_insight(prompt)
     st.success(recommendation)
 
@@ -234,6 +234,24 @@ elif selected == "Predictive Modeling":
     st.session_state['scaler'] = scaler
     st.session_state['features'] = feats
 
+# --- PAGE 4: DECISION SUPPORT ---
+elif selected == "Decision Support":
+    st.title("💼 Decision Support System")
+
+    trained_models = st.session_state.get('trained_models', {})
+    scaler = st.session_state.get('scaler', None)
+    feats = st.session_state.get('features', [])
+
+    if not trained_models or scaler is None or not feats:
+        st.warning("Please run the Predictive Modeling page first.")
+    else:
+        # Model selection
+        models_sel = st.multiselect(
+            "Select model(s)",
+            options=list(trained_models.keys()),
+            default=list(trained_models.keys())
+        )
+        
 # --- PAGE 4: DECISION SUPPORT ---
 elif selected == "Decision Support":
     st.title("💼 Decision Support System")
@@ -278,10 +296,23 @@ elif selected == "Decision Support":
                     })
             df_in = pd.DataFrame(st.session_state['manual_entries'])
 
-        # --- RE-COMPUTE ENGINEERED FEATURES ---
-        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
-        df_in['Intensity'] = df_in['Frequency'] / (df_in['Recency'] + 1)
+        # —————— Normalise & validate column names ——————
+        # strip spaces so ' Monetary ' still works
+        df_in.rename(columns=lambda x: x.strip(), inplace=True)
 
+        required_cols = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age', 'CampaignResponse']
+        missing = [c for c in required_cols if c not in df_in.columns]
+        if missing:
+            st.error(f"❌ Missing column(s): {', '.join(missing)}. "
+                     "Please upload a CSV with headers exactly: "
+                     "Recency, Frequency, Monetary, Time, Age, CampaignResponse.")
+            st.stop()
+
+        # —————— RE-COMPUTE ENGINEERED FEATURES ——————
+        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
+        df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
+
+        # Display input and predictions as before
         st.subheader("🔢 Input Data")
         st.dataframe(df_in)
 
@@ -291,10 +322,10 @@ elif selected == "Decision Support":
         for name in models_sel:
             model = trained_models[name]
             prob = model.predict_proba(X_input)[:, 1]
-            rec = np.where(prob > 0.7, 'SMS Campaign', 
-                           np.where(prob > 0.4, 'Email Reminder', 'Deprioritize'))
-            out[f'Prob_{name}'] = np.round(prob, 3)
-            out[f'Rec_{name}'] = rec
+            rec = np.where(prob > 0.7, 'SMS Campaign',
+                   np.where(prob > 0.4, 'Email Reminder', 'Deprioritize'))
+            out[f'Prob_{name}']  = np.round(prob, 3)
+            out[f'Rec_{name}']   = rec
             out[f'Value_{name}'] = np.round(prob * 150, 2)
 
         st.subheader("📋 Recommendations")
@@ -305,4 +336,3 @@ elif selected == "Decision Support":
             file_name='donor_recommendations.csv',
             mime='text/csv'
         )
-   
