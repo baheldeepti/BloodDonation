@@ -53,7 +53,7 @@ def get_gpt_insight(prompt: str) -> str:
 if selected == "Introduction":
     st.title("🩸 Blood Donation Decision Support System")
     st.image(
-        "https://images.app.goo.gl/QVAQxQ4EFBcssNHcA",
+        "https://news-notes.ufhealth.org/files/2020/02/foweb_blood_donation_art_pg26.jpg",
         caption="Donate Blood, Save Lives", width = 700
     )
     st.markdown(
