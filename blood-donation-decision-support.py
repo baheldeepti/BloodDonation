@@ -349,51 +349,137 @@ elif selected == "🤖 Modeling & Recommendations":
         )
         st.info(get_gpt_insight(prompt))
 
-# --- PAGE 5: OPTIMIZATION ---
+# --- PAGE 5: CAMPAIGN BUDGET OPTIMIZATION ---
 elif selected == "📈 Budget Optimization":
-    st.title("📈 Budget Optimization")
-    df_in = pd.DataFrame(st.session_state.get('manual_entries', []))
-    if df_in.empty:
-        st.warning("No donor data available. Please add entries in Modeling & Recommendations.")
+    st.title("📈 Campaign Budget Optimization")
+    st.markdown(
+        """
+        **What is this?**  
+        This tool helps you decide *which* donors to contact given a fixed outreach budget, 
+        so you maximize your *expected* donation return.
+
+        **Where does donor data come from?**  
+        You can either upload a CSV file here or manually enter one donor at a time below.
+        """
+    )
+
+    # ➤ Data Input
+    st.subheader("1. Donation Data Input")
+    uploaded = st.file_uploader("Upload donor data CSV", type=["csv"])
+    if uploaded:
+        df_in = pd.read_csv(uploaded)
+        st.success("✅ CSV loaded!")
     else:
-        models = st.session_state['trained_models']
-        scaler = st.session_state['scaler']
-        feats = st.session_state['features']
+        # manual entry form
+        if "manual_opt" not in st.session_state:
+            st.session_state.manual_opt = []
+        with st.form("opt_entry_form", clear_on_submit=True):
+            r = st.number_input("Recency (months since last donation)", 0, 100, 10)
+            f = st.number_input("Frequency (total donations)", 1, 50, 2)
+            m = st.number_input("Monetary (total mL donated)", 0, 5000, 500)
+            t = st.number_input("Time (months since first donation)", 1, 200, 12)
+            a = st.number_input("Age (years)", 18, 100, 35)
+            c = st.selectbox("Responded to last campaign?", ["Yes", "No"])
+            if st.form_submit_button("Add donor"):
+                st.session_state.manual_opt.append({
+                    "Recency": r,
+                    "Frequency": f,
+                    "Monetary": m,
+                    "Time": t,
+                    "Age": a,
+                    "CampaignResponse": 1 if c == "Yes" else 0
+                })
+                st.success("Donor added!")
+        df_in = pd.DataFrame(st.session_state.manual_opt)
 
-        model_name = st.selectbox("Choose model", list(models.keys()))
+    if df_in.empty:
+        st.info("Please upload a CSV or add at least one donor above.")
+    else:
+        st.subheader("2. Preview & Explain Data")
+        st.dataframe(df_in)
+        st.markdown(
+            """
+            **Glossary of terms:**  
+            - **Recency:** Months since last donation.  
+            - **Frequency:** How many times they’ve donated.  
+            - **Monetary:** Total volume donated (in mL).  
+            - **Time:** Months since first donation.  
+            - **CampaignResponse:** Whether they engaged with the last outreach (1=Yes, 0=No).
+            """
+        )
+
+        # ➤ Feature engineering (same as modeling page)
+        df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+        df_in["Intensity"] = df_in["Frequency"] / (df_in["Recency"] + 1)
+
+        # ➤ Pick trained model
+        models = st.session_state["trained_models"]
+        scaler = st.session_state["scaler"]
+        feats = st.session_state["features"]
+        model_name = st.selectbox("Choose predictive model", list(models.keys()))
         model = models[model_name]
-        df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
-        df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
 
+        # ➤ Predict probabilities
         X_opt = scaler.transform(df_in[feats])
-        p_i = model.predict_proba(X_opt)[:,1]
+        p_i = model.predict_proba(X_opt)[:, 1]
         df_opt = df_in.copy()
-        df_opt['p_i'] = p_i
+        df_opt["Predicted Probability"] = np.round(p_i, 3)
+        st.subheader("3. Predicted Donation Probability")
+        st.markdown(
+            "This is the model’s best guess, on a scale from 0 to 1, of how likely each donor is to give again."
+        )
+        st.dataframe(df_opt)
 
-        st.subheader("💲 Set Parameters")
+        # ➤ Budget parameters
+        st.subheader("4. Set Your Budget & Values")
         v = st.number_input("Value per successful donation (USD)", value=150)
         c = st.number_input("Cost per contact (USD)", value=1)
         B = st.number_input("Total budget (USD)", value=100)
 
+        # ➤ Build & solve optimization
         n = len(df_opt)
         prob_lp = LpProblem("donor_allocation", LpMaximize)
-        x_vars = [LpVariable(f"x_{i}", cat=LpBinary) for i in range(n)]
-        prob_lp += lpSum([x_vars[i]*(df_opt.loc[i,'p_i']*v - c) for i in range(n)])
-        prob_lp += lpSum([x_vars[i]*c for i in range(n)]) <= B
+        x = [LpVariable(f"x_{i}", cat=LpBinary) for i in range(n)]
+        # Maximize sum(x_i * (p_i * v - c)) subject to sum(x_i * c) <= B
+        prob_lp += lpSum([x[i] * (p_i[i] * v - c) for i in range(n)])
+        prob_lp += lpSum([x[i] * c for i in range(n)]) <= B
         prob_lp.solve()
 
-        df_opt['select'] = [int(x_vars[i].value()) for i in range(n)]
-        df_opt['expected_value'] = df_opt['p_i'] * v
+        df_opt["Contact"] = [int(x[i].value()) for i in range(n)]
+        df_opt["Expected Return"] = np.round(df_opt["Predicted Probability"] * v, 2)
 
-        st.subheader("📊 Optimization Results")
+        # ➤ Display optimization results
+        st.subheader("5. Optimization Results")
+        st.markdown(
+            "**Contact=1** means the model recommends you reach out to that donor."
+        )
         st.dataframe(df_opt)
-        st.metric("Total Expected Savings (USD)", f"{df_opt.loc[df_opt['select']==1,'expected_value'].sum():.2f}")
-        st.metric("Total Contact Cost (USD)", f"{df_opt['select'].sum()*c:.2f}")
-        st.metric("Donors Selected", int(df_opt['select'].sum()))
+
+        st.metric(
+            "Total Expected Return (USD)",
+            f"{df_opt.loc[df_opt['Contact'] == 1, 'Expected Return'].sum():.2f}"
+        )
+        st.metric(
+            "Total Contact Cost (USD)",
+            f"{df_opt['Contact'].sum() * c:.2f}"
+        )
+        st.metric("Number of Donors Selected", int(df_opt["Contact"].sum()))
 
         st.download_button(
-            "📥 Download Optimization Results",
+            "📥 Download Results CSV",
             df_opt.to_csv(index=False),
-            file_name='optimization_results.csv',
-            mime='text/csv'
+            file_name="optimization_results.csv",
+            mime="text/csv"
         )
+
+        # ➤ AI-Generated Strategy Insights
+        st.subheader("6. AI-Generated Strategy Insights")
+        ai_prompt = (
+            "You are a nonprofit fundraising strategist.\n"
+            "Given the following optimization table (with columns Recency, Frequency, ... "
+            f"and Contact, Expected Return):\n\n{df_opt.to_csv(index=False)}\n\n"
+            "Provide three concise, non-technical recommendations "
+            "on how to adjust outreach strategy for better ROI."
+        )
+        insight = get_gpt_insight(ai_prompt)
+        st.info(insight)
