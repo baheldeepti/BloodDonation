@@ -43,7 +43,7 @@ def generate_data(n=1000):
 @st.cache_data
 def get_gpt_insight(prompt: str) -> str:
     openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
-    resp = openai.ChatCompletion.create(
+    resp = openai.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}]
     )
@@ -54,8 +54,7 @@ if selected == "Introduction":
     st.title("🩸 Blood Donation Decision Support System")
     st.image(
         "https://cdn.pixabay.com/photo/2017/02/01/12/41/donation-2025392_960_720.png",
-        caption="Donate Blood, Save Lives",
-        use_column_width=True
+        caption="Donate Blood, Save Lives"
     )
     st.markdown(
         """
