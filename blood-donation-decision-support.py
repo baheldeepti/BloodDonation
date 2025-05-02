@@ -23,7 +23,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 st.sidebar.title("Navigation")
 selected = st.sidebar.radio(
     label="Go to", 
-    options=["Introduction", "Exploratory Analysis", "Predictive Modeling", "Decision Support"]
+    options=["Introduction", "Exploratory Analysis", "Predictive Modeling and Recommendations"]
 )
 
 # Dummy data generator
