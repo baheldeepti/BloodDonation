@@ -144,206 +144,188 @@ elif selected == "Exploratory Analysis":
     ins = get_gpt_insight(prompt)
     st.info(ins)
 
-# --- PAGE 3: PREDICTIVE MODELING ---
-elif selected == "Predictive Modeling":
-    st.title("🔍 Predictive Modeling")
+# --- PAGE: MODELING & DECISION SUPPORT ---
+elif selected == "Modeling & Decision Support":
+    st.title("🔍 Modeling & Decision Support")
+    st.markdown(
+        """
+        This single page will:
+        1. Engineer features & select top-7 by correlation  
+        2. Check multicollinearity  
+        3. Train base & ensemble models, compare via ROC  
+        4. Show confusion matrix for the best model  
+        5. Accept new donor data and produce personalized recommendations  
+        6. Generate AI-powered insights
+        """
+    )
+
+    # 1) Load data & feature engineering
     df = generate_data()
-    df['Monetary_per_Freq'] = df['Monetary']/(df['Frequency']+1)
-    df['Intensity'] = df['Frequency']/(df['Recency']+1)
-    corr = df.corr()['Target'].abs().sort_values(ascending=False)
-    feats = corr.index[1:8].tolist()
-    X = df[feats]
-    y = df['Target']
+    df['Monetary_per_Freq'] = df['Monetary'] / (df['Frequency'] + 1)
+    df['Intensity']         = df['Frequency'] / (df['Recency'] + 1)
 
-    # Split and scale
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-    scaler = StandardScaler().fit(X_train)
-    X_tr = scaler.transform(X_train)
-    X_te = scaler.transform(X_test)
+    # 2) Select top-7 features by |corr| with Target
+    corr_t   = df.corr()['Target'].abs().sort_values(ascending=False)
+    feats    = corr_t.index[1:8].tolist()
+    st.subheader("🔑 Top 7 Features")
+    st.table(pd.DataFrame({
+        'Feature': feats,
+        '|Corr| w/ Target': corr_t[feats].round(3).values
+    }))
 
-    # Models and hyperparameters
-    models = {
-        'Logistic Regression': LogisticRegression(max_iter=1000),
-        'Random Forest': RandomForestClassifier(),
-        'Gradient Boosting': GradientBoostingClassifier(),
-        'XGBoost': XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
-        'CatBoost': CatBoostClassifier(verbose=0),
-        'SVM': SVC(probability=True)
+    # 3) Multicollinearity check
+    fcorr = df[feats].corr().abs()
+    pairs = [
+        (fcorr.index[i], fcorr.columns[j], fcorr.iloc[i, j])
+        for i in range(len(fcorr)) for j in range(i)
+        if fcorr.iloc[i, j] > .9
+    ]
+    if pairs:
+        st.warning("🚨 High collinearity:")
+        for f1, f2, v in pairs:
+            st.write(f"• {f1} ↔ {f2}: {v:.2f}")
+        st.info("Drop/combine one of each pair.")
+    else:
+        st.success("✅ No high collinearity.")
+
+    # 4) Train/test split & scaling
+    X = df[feats]; y = df['Target']
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=42)
+    scaler = StandardScaler().fit(X_tr)
+    X_trs, X_tes = scaler.transform(X_tr), scaler.transform(X_te)
+
+    # 5) Base models + hyperparams
+    base = {
+        'LogReg': LogisticRegression(max_iter=1000),
+        'RF':      RandomForestClassifier(),
+        'GB':      GradientBoostingClassifier(),
+        'XGB':     XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+        'CB':      CatBoostClassifier(verbose=0),
+        'SVM':     SVC(probability=True)
     }
     params = {
-        'Random Forest': {'n_estimators': [100], 'max_depth': [3, 5]},
-        'Gradient Boosting': {'n_estimators': [100], 'learning_rate': [0.05]},
-        'XGBoost': {'n_estimators': [100], 'max_depth': [3]},
-        'CatBoost': {'depth': [4], 'learning_rate': [0.05]},
-        'SVM': {'C': [1.0], 'kernel': ['rbf']}
+        'RF':  {'n_estimators':[100],'max_depth':[3,5]},
+        'GB':  {'n_estimators':[100],'learning_rate':[0.05]},
+        'XGB': {'n_estimators':[100],'max_depth':[3]},
+        'CB':  {'depth':[4],'learning_rate':[0.05]},
+        'SVM': {'C':[1.0],'kernel':['rbf']}
     }
 
-    results = []
-    fig_roc, ax_roc = plt.subplots(figsize=(10, 6))
-    trained_models = {}
+    results = []; trained = {}
+    fig_roc, ax_roc = plt.subplots(figsize=(8,6))
 
-    for name, model in models.items():
+    # 6) Fit base models
+    for name, mdl in base.items():
         if name in params:
-            grid = GridSearchCV(model, params[name], scoring='roc_auc', cv=3)
-            grid.fit(X_tr, y_train)
-            best = grid.best_estimator_
+            gs = GridSearchCV(mdl, params[name], scoring='roc_auc', cv=3)
+            gs.fit(X_trs, y_tr); best = gs.best_estimator_
         else:
-            best = model.fit(X_tr, y_train)
-
-        y_pred = best.predict(X_te)
-        y_proba = best.predict_proba(X_te)[:, 1]
-        fpr, tpr, _ = roc_curve(y_test, y_proba)
-        auc = roc_auc_score(y_test, y_proba)
-
+            best = mdl.fit(X_trs, y_tr)
+        y_p = best.predict(X_tes); y_pr = best.predict_proba(X_tes)[:,1]
+        fpr, tpr, _ = roc_curve(y_te, y_pr)
+        auc = roc_auc_score(y_te, y_pr)
         results.append({
-            'Model': name,
-            'AUC': round(auc, 3),
-            'Accuracy': round(accuracy_score(y_test, y_pred), 3),
-            'F1 Score': round(f1_score(y_test, y_pred), 3),
-            'Precision': round(precision_score(y_test, y_pred), 3),
-            'Recall': round(recall_score(y_test, y_pred), 3)
+            'Model': name, 'AUC':round(auc,3),
+            'Acc':round(accuracy_score(y_te,y_p),3),
+            'F1': round(f1_score(y_te,y_p),3),
+            'Prec':round(precision_score(y_te,y_p),3),
+            'Rec': round(recall_score(y_te,y_p),3)
         })
-        trained_models[name] = best
-        ax_roc.plot(fpr, tpr, label=f"{name} (AUC={auc:.2f})")
+        trained[name] = best
+        ax_roc.plot(fpr, tpr, label=f"{name} ({auc:.2f})")
 
-    # Display model comparison
+    # 7) Ensembles: soft Voting & Stacking
+    top3 = [r['Model'] for r in sorted(results, key=lambda x: x['AUC'], reverse=True)[:3]]
+    voting = VotingClassifier(
+        estimators=[(n, trained[n]) for n in top3], voting='soft'
+    ).fit(X_trs, y_tr)
+    y_v, y_vp = voting.predict(X_tes), voting.predict_proba(X_tes)[:,1]
+    fpr_v, tpr_v, _ = roc_curve(y_te, y_vp); auc_v = roc_auc_score(y_te, y_vp)
+    results.append({'Model':'Voting','AUC':round(auc_v,3),
+                    'Acc':round(accuracy_score(y_te,y_v),3),
+                    'F1':round(f1_score(y_te,y_v),3),
+                    'Prec':round(precision_score(y_te,y_v),3),
+                    'Rec':round(recall_score(y_te,y_v),3)})
+    trained['Voting'] = voting
+    ax_roc.plot(fpr_v, tpr_v, '--', label=f"Voting ({auc_v:.2f})")
+
+    stacking = StackingClassifier(
+        estimators=[(n, trained[n]) for n in top3],
+        final_estimator=LogisticRegression(), cv=3
+    ).fit(X_trs, y_tr)
+    y_s, y_sp = stacking.predict(X_tes), stacking.predict_proba(X_tes)[:,1]
+    fpr_s, tpr_s, _ = roc_curve(y_te, y_sp); auc_s = roc_auc_score(y_te, y_sp)
+    results.append({'Model':'Stacking','AUC':round(auc_s,3),
+                    'Acc':round(accuracy_score(y_te,y_s),3),
+                    'F1':round(f1_score(y_te,y_s),3),
+                    'Prec':round(precision_score(y_te,y_s),3),
+                    'Rec':round(recall_score(y_te,y_s),3)})
+    trained['Stacking'] = stacking
+    ax_roc.plot(fpr_s, tpr_s, '-.', label=f"Stacking ({auc_s:.2f})")
+
+    # 8) Show comparison & ROC
     st.subheader("📋 Model Comparison")
-    results_df = pd.DataFrame(results)
-    #results_df['Recommended'] = ['*' if i==0 else '' for i in results_df.index]
-    metric_cols = ['AUC','Accuracy','F1 Score','Precision','Recall']
-    styled_df = results_df.style         .background_gradient(subset=metric_cols, cmap='Greens')        .highlight_max(subset=metric_cols, color='lightgreen')         .highlight_min(subset=metric_cols, color='salmon')
-    st.dataframe(styled_df)
- 
+    df_res = pd.DataFrame(results).sort_values('AUC', ascending=False).reset_index(drop=True)
+    st.dataframe(df_res.style
+        .background_gradient(subset=['AUC','Acc','F1','Prec','Rec'], cmap='Greens')
+        .highlight_max(subset=['AUC','Acc','F1','Prec','Rec'], color='lightgreen')
+        .highlight_min(subset=['AUC','Acc','F1','Prec','Rec'], color='salmon')
+    )
 
-    # Display ROC curves
     st.subheader("📉 ROC Curves")
-    ax_roc.plot([0, 1], [0, 1], 'k--')
-    ax_roc.set_xlabel('False Positive Rate')
-    ax_roc.set_ylabel('True Positive Rate')
-    ax_roc.legend()
-    st.pyplot(fig_roc)
+    ax_roc.plot([0,1],[0,1],'k--'); ax_roc.set_xlabel('FPR'); ax_roc.set_ylabel('TPR')
+    ax_roc.legend(loc='lower right'); st.pyplot(fig_roc)
 
-    # GPT recommendation
-    st.subheader("🤖 GPT-3.5 Recommendation")
-    prompt = "Act as data analyst and Given this model comparison table, recommend the best model and give appropriate recommendations for next steps and impact" + results_df.to_csv(index=False)
-    recommendation = get_gpt_insight(prompt)
-    st.success(recommendation)
-
-    # Save to session state
-    st.session_state['trained_models'] = trained_models
-    st.session_state['scaler'] = scaler
-    st.session_state['features'] = feats
-
-# --- PAGE 4: DECISION SUPPORT ---
-elif selected == "Decision Support":
-    st.title("💼 Decision Support System")
-
-    trained_models = st.session_state.get('trained_models', {})
-    scaler = st.session_state.get('scaler', None)
-    feats = st.session_state.get('features', [])
-
-    if not trained_models or scaler is None or not feats:
-        st.warning("Please run the Predictive Modeling page first.")
-    else:
-        # Model selection
-        models_sel = st.multiselect(
-            "Select model(s)",
-            options=list(trained_models.keys()),
-            default=list(trained_models.keys())
-        )
-        
-# --- PAGE 4: DECISION SUPPORT ---
-elif selected == "Decision Support":
-    st.title("💼 Decision Support System")
-
-    # 1) make sure we have models from page 3
-    trained_models = st.session_state.get('trained_models', {})
-    scaler         = st.session_state.get('scaler', None)
-    feats          = st.session_state.get('features', [])
-
-    if not trained_models or scaler is None or not feats:
-        st.warning("Please run the Predictive Modeling page first.")
-        st.stop()
-
-    # 2) let the user pick which model(s) to apply
-    models_sel = st.multiselect(
-        "Select model(s) to use for prediction",
-        options=list(trained_models.keys()),
-        default=list(trained_models.keys())
+    # 9) Confusion matrix of best
+    from sklearn.metrics import confusion_matrix
+    best = df_res.loc[0,'Model']; m = trained[best]
+    cm = confusion_matrix(y_te, m.predict(X_tes))
+    fig_cm, ax_cm = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm)
+    ax_cm.set(title=f"Confusion Matrix: {best}", xlabel='Pred', ylabel='Actual')
+    st.subheader("🔍 Confusion Matrix")
+    st.pyplot(fig_cm)
+        # 11) AI insights
+    st.subheader("🤖 AI Insights & Next Steps")
+    prompt = (
+        "Senior data scientist with 20 yrs exp. Given:\n\n"
+        f"{df_res.to_csv(index=False)}\n\n"
+        f"ConfMatrix({best}): {cm.tolist()}\n\n"
+        "Recommend best model, improvements, next steps."
     )
+    st.info(get_gpt_insight(prompt))
 
-    st.markdown("---\n### ① Provide new donor data\n")
 
-    # 3a) file uploader
-    uploaded_file = st.file_uploader("Upload donor data CSV", type="csv")
+    # 11) New data & recommendations
+    st.subheader("🔄 Data Input & Personalized Recommendations")
+    st.markdown("---\n### ➤ Provide new donor data")
+    if 'manual' not in st.session_state: st.session_state['manual']=[]
+    with st.form("form", clear_on_submit=True):
+        r=st.number_input('Recency',0,50,10); f=st.number_input('Frequency',1,10,2)
+        m=st.number_input('Monetary',0,2000,500); t=st.number_input('Time',1,100,12)
+        a=st.number_input('Age',18,100,35)
+        c=st.selectbox('CampaignResponse',['Yes','No'])
+        if st.form_submit_button("Add"):
+            st.session_state['manual'].append({
+                'Recency':r,'Frequency':f,'Monetary':m,'Time':t,
+                'Age':a,'CampaignResponse':1 if c=='Yes' else 0
+            }); st.success("Added")
 
-    # 3b) manual‐entry form
-    if 'manual_entries' not in st.session_state:
-        st.session_state['manual_entries'] = []
-
-    with st.form("manual_entry_form", clear_on_submit=True):
-        r = st.number_input('Recency (months since last donation)', min_value=0, max_value=50, value=10)
-        f = st.number_input('Frequency (total donations)',      min_value=1, max_value=10, value=2)
-        m = st.number_input('Monetary (mL donated)',           min_value=0, max_value=2000, value=500)
-        t = st.number_input('Time (months since first donation)', min_value=1, max_value=100, value=12)
-        a = st.number_input('Age (years)',                     min_value=18, max_value=100, value=35)
-        c = st.selectbox('Responded to campaign?', ['Yes', 'No'])
-        submitted = st.form_submit_button("Add Entry")
-        if submitted:
-            st.session_state['manual_entries'].append({
-                'Recency': r,
-                'Frequency': f,
-                'Monetary': m,
-                'Time': t,
-                'Age': a,
-                'CampaignResponse': 1 if c == 'Yes' else 0
-            })
-            st.success("✅ Entry added")
-
-    # 4) build the DataFrame from either source
-    if uploaded_file is not None:
-        df_in = pd.read_csv(uploaded_file)
+    df_new = pd.DataFrame(st.session_state['manual'])
+    if df_new.empty:
+        st.info("Upload CSV or add an entry.")
     else:
-        df_in = pd.DataFrame(st.session_state['manual_entries'])
+        st.dataframe(df_new)
+        df_new['Monetary_per_Freq']=df_new['Monetary']/(df_new['Frequency']+1)
+        df_new['Intensity']=df_new['Frequency']/(df_new['Recency']+1)
+        Xn = scaler.transform(df_new[feats])
+        out = df_new.copy()
+        for name, mdl in trained.items():
+            prob = mdl.predict_proba(Xn)[:,1]
+            rec  = np.where(prob>0.7,'SMS','Email','Deprioritize')
+            out[f'Prob_{name}']=prob.round(3)
+            out[f'Rec_{name}']=rec
+            out[f'Value_{name}']=(prob*150).round(2)
+        st.subheader("📋 Recommendations"); st.dataframe(out)
+        st.download_button("Download CSV", out.to_csv(index=False), "recs.csv","text/csv")
 
-    # 5) if there's still no data, prompt and stop before error
-    if df_in.empty:
-        st.info("👉 Please upload a CSV **or** add at least one manual entry above.")
-        st.stop()
-
-    # 6) tidy up column names & validate
-    df_in.rename(columns=lambda x: x.strip(), inplace=True)
-    required = ['Recency','Frequency','Monetary','Time','Age','CampaignResponse']
-    missing  = [c for c in required if c not in df_in.columns]
-    if missing:
-        st.error(f"❌ Missing column(s): {', '.join(missing)}")
-        st.error("Your data must have headers: " + ", ".join(required))
-        st.stop()
-
-    # 7) engineer features & predict
-    df_in['Monetary_per_Freq'] = df_in['Monetary'] / (df_in['Frequency'] + 1)
-    df_in['Intensity']         = df_in['Frequency'] / (df_in['Recency'] + 1)
-
-    st.subheader("🔢 Input Data")
-    st.dataframe(df_in)
-
-    X_input = scaler.transform(df_in[feats])
-    out     = df_in.copy()
-    for name in models_sel:
-        model = trained_models[name]
-        prob  = model.predict_proba(X_input)[:,1]
-        rec   = np.where(prob > 0.7, 'SMS Campaign',
-                 np.where(prob > 0.4, 'Email Reminder', 'Deprioritize'))
-        out[f'Prob_{name}']  = np.round(prob,3)
-        out[f'Rec_{name}']   = rec
-        out[f'Value_{name}'] = np.round(prob * 150,2)
-
-    st.subheader("📋 Recommendations")
-    st.dataframe(out)
-
-    st.download_button(
-        "📥 Download Recommendations",
-        out.to_csv(index=False),
-        file_name='donor_recommendations.csv',
-        mime='text/csv'
-    )
