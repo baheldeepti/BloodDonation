@@ -432,19 +432,23 @@ elif selected == "🤖 Modeling & Recommendations":
     st.subheader("🤖 AI Model Comparison & Recommendations")
     ai_prompt = (
     "You are a Senior Data Scientist with 20 years of experience. "
-    "Below are two result tables: the original basic-model results (df_res) and the advanced tuning & ensemble results (df_results).\n\n"
+    "Below are two CSV tables: the original basic-model results (`df_res`) and the advanced "
+    "hyperparameter tuning & ensemble results (`df_results`).\n\n"
     f"Original Models:\n{df_res.to_csv(index=False)}\n\n"
     f"Tuned & Ensemble Models:\n{df_results.to_csv(index=False)}\n\n"
-    "1) **Performance Comparison**: For each model, indicate whether hyperparameter tuning (or ensembling) improved its performance over the original, and by how much (e.g. Δ ROC AUC).\n\n"
-    "2) **Use Case Table**: Provide a markdown table with columns `Model`, `Best Use Case`, and `Improvement?` (Yes/No) describing:\n"
-    "   - which donor outreach scenario each model is ideal for,\n"
-    "   - and whether tuning boosted its performance.\n\n"
-    "3) **Recommendations**: List 2–3 bullet points. For each bullet, include:\n"
-    "- **Recommendation:** The action to take.\n"
-    "- **Why:** The rationale behind it.\n"
-    "- **Impact:** The expected benefit for our donor outreach strategy.\n\n"
-    "Format everything clearly in markdown so it’s ready to share with the team."
+    "1) **Combined Performance & Use Case Table**: Create a single markdown table with these columns:\n"
+    "   - `Model`\n"
+    "   - `Best Use Case` (which donor-outreach scenario it's ideal for)\n"
+    "   - `Improvement?` (Yes/No, indicating if tuning improved over original)\n"
+    "   - `Δ ROC AUC` (the change in ROC AUC, e.g. +0.03)\n\n"
+    "Include the “Voting Ensemble” as its own row in this table.\n\n"
+    "2) **Recommendations**: Below the table, list 2–3 bullet points. For each:\n"
+    "   - **Recommendation:** The action to take.\n"
+    "   - **Why:** The rationale.\n"
+    "   - **Impact:** The expected benefit for our donor outreach strategy.\n\n"
+    "Format everything in clear markdown."
 )
+
     st.info(get_gpt_insight(ai_prompt))
     
 
