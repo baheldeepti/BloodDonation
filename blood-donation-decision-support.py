@@ -263,11 +263,19 @@ elif selected == "🤖 Modeling & Recommendations":
     # AI insights & next steps
     st.subheader("🤖 AI Insights & Next Steps")
     prompt = (
-        "Senior data scientist with 20 yrs exp. Given:\n\n"
+        "You are a Senior Data Scientist with 20 years of experience. Given the following model comparison results:\n\n"
         f"{df_res.to_csv(index=False)}\n\n"
-        "Recommend best model and business cases where which model would fit best and recommendations"
+        "1) **Model Use Cases**: Present a markdown table with two columns—`Model` and `Best Use Case`—"
+        "mapping each model to the outreach scenario it’s best suited for.\n\n"
+        "2) **Recommendations**: Under this heading, list 2–3 bullet points. For each bullet, include:\n"
+        "   - **Recommendation:** The action to take.\n"
+        "   - **Why:** The rationale behind it.\n"
+        "   - **Impact:** The expected benefit for our donor outreach strategy.\n\n"
+        "Format everything clearly in markdown so it’s easy to read and share."
     )
     st.info(get_gpt_insight(prompt))
+
+
 
 # --- PAGE 5: CAMPAIGN BUDGET OPTIMIZATION ---
 elif selected == "📈 Budget Optimization":
