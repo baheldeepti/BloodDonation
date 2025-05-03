@@ -252,9 +252,7 @@ elif selected == "🤖 Modeling & Recommendations":
     )
     
     st.dataframe(styled)
-    st.subheader("📋 Model Comparison")
-    df_res = pd.DataFrame(results).sort_values('ROC AUC', ascending=False).reset_index(drop=True)
-    st.dataframe(df_res)
+
 
     # 9) Persist for optimization page
     st.session_state['trained_models'] = trained_models
@@ -435,19 +433,20 @@ elif selected == "🤖 Modeling & Recommendations":
     # --- AI-Generated Model Comparison & Recommendations ---
     st.subheader("🤖 AI Model Comparison & Recommendations")
     ai_prompt = (
-        "You are a Senior Data Scientist with 20 years of experience. "
-        "Below are two tables: the basic-model results (in df_res) and the advanced "
-        "tuning & ensembling results (in df_results).\n\n"
-        f"Basic Models:\n{df_res.to_csv(index=False)}\n\n"
-        f"Tuned & Ensemble Models:\n{df_results.to_csv(index=False)}\n\n"
-        "1) **Use Case Table**: Provide a markdown table with columns `Model` and `Best Use Case` "
-        "describing the ideal donor outreach scenario for each model.\n\n"
-        "2) **Recommendations**: List 2–3 bullet points. For each bullet, include:\n"
-        "- **Recommendation:** The action to take.\n"
-        "- **Why:** The rationale.\n"
-        "- **Impact:** The expected benefit for our donor outreach strategy.\n\n"
-        "Format everything in clear markdown."
-    )
+    "You are a Senior Data Scientist with 20 years of experience. "
+    "Below are two result tables: the original basic-model results (df_res) and the advanced tuning & ensemble results (df_results).\n\n"
+    f"Original Models:\n{df_res.to_csv(index=False)}\n\n"
+    f"Tuned & Ensemble Models:\n{df_results.to_csv(index=False)}\n\n"
+    "1) **Performance Comparison**: For each model, indicate whether hyperparameter tuning (or ensembling) improved its performance over the original, and by how much (e.g. Δ ROC AUC).\n\n"
+    "2) **Use Case Table**: Provide a markdown table with columns `Model`, `Best Use Case`, and `Improvement?` (Yes/No) describing:\n"
+    "   - which donor outreach scenario each model is ideal for,\n"
+    "   - and whether tuning boosted its performance.\n\n"
+    "3) **Recommendations**: List 2–3 bullet points. For each bullet, include:\n"
+    "- **Recommendation:** The action to take.\n"
+    "- **Why:** The rationale behind it.\n"
+    "- **Impact:** The expected benefit for our donor outreach strategy.\n\n"
+    "Format everything clearly in markdown so it’s ready to share with the team."
+)
     st.info(get_gpt_insight(ai_prompt))
     
 
