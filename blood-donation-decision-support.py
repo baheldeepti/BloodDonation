@@ -233,9 +233,29 @@ elif selected == "🤖 Modeling & Recommendations":
     st.pyplot(plt)
 
     # 8) Show comparison table
+    # 8) Show comparison table
     st.subheader("📋 Model Comparison")
-    df_res = pd.DataFrame(results).sort_values('ROC AUC', ascending=False).reset_index(drop=True)
-    st.dataframe(df_res)
+    
+    df_res = (
+        pd.DataFrame(results)
+          .sort_values('ROC AUC', ascending=False)
+          .reset_index(drop=True)
+    )
+    
+    metrics = ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC AUC']
+    
+    # Color‐code only the metric columns:
+    styled = (
+        df_res.style
+              .background_gradient(subset=metrics, cmap='Greens')
+              .highlight_max(subset=metrics, color='lightgreen')
+              .highlight_min(subset=metrics, color='salmon')
+    )
+    
+    st.dataframe(styled)
+        st.subheader("📋 Model Comparison")
+        df_res = pd.DataFrame(results).sort_values('ROC AUC', ascending=False).reset_index(drop=True)
+        st.dataframe(df_res)
 
     # 9) Persist for optimization page
     st.session_state['trained_models'] = trained_models
@@ -383,42 +403,7 @@ elif selected == "📈 Budget Optimization":
         v = st.number_input("Value per successful donation (USD)", value=150)
         c = st.number_input("Cost per contact (USD)", value=1)
         B = st.number_input("Total budget (USD)", value=100)
-
-        # ➤ Build & solve optimization
-        n = len(df_opt)
-        prob_lp = LpProblem("donor_allocation", LpMaximize)
-        x = [LpVariable(f"x_{i}", cat=LpBinary) for i in range(n)]
-        # Maximize sum(x_i * (p_i * v - c)) subject to sum(x_i * c) <= B
-        prob_lp += lpSum([x[i] * (p_i[i] * v - c) for i in range(n)])
-        prob_lp += lpSum([x[i] * c for i in range(n)]) <= B
-        prob_lp.solve()
-
-        df_opt["Contact"] = [int(x[i].value()) for i in range(n)]
-        df_opt["Expected Return"] = np.round(df_opt["Predicted Probability"] * v, 2)
-
-        # ➤ Display optimization results
-        st.subheader("5. Optimization Results")
-        st.markdown(
-            "**Contact=1** means the model recommends you reach out to that donor."
-        )
-        st.dataframe(df_opt)
-
-        st.metric(
-            "Total Expected Return (USD)",
-            f"{df_opt.loc[df_opt['Contact'] == 1, 'Expected Return'].sum():.2f}"
-        )
-        st.metric(
-            "Total Contact Cost (USD)",
-            f"{df_opt['Contact'].sum() * c:.2f}"
-        )
-        st.metric("Number of Donors Selected", int(df_opt["Contact"].sum()))
-
-        st.download_button(
-            "📥 Download Results CSV",
-            df_opt.to_csv(index=False),
-            file_name="optimization_results.csv",
-            mime="text/csv"
-        )
+        
 
         # ➤ AI-Generated Strategy Insights
         st.subheader("6. AI-Generated Strategy Insights")
