@@ -265,7 +265,6 @@ elif selected == "🤖 Modeling & Recommendations":
     prompt = (
         "Senior data scientist with 20 yrs exp. Given:\n\n"
         f"{df_res.to_csv(index=False)}\n\n"
-        f"Confusion Matrix ({best_model}): {cm.tolist()}\n\n"
         "Recommend best model and business cases where which model would fit best and recommendations"
     )
     st.info(get_gpt_insight(prompt))
