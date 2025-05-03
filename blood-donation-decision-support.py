@@ -509,7 +509,7 @@ elif selected == "📈 Budget Optimization":
 
     # 3) Feature engineering (must match exactly what the models were trained on)
     df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
-    df_in["Donation_Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
+    df_in["Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
     # (If you have other engineered features, compute them here too)
 
     # 4) Model‐set selection
