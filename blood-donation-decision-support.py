@@ -260,9 +260,6 @@ elif selected == "🤖 Modeling & Recommendations":
     st.session_state['trained_models'] = trained_models
     st.session_state['scaler']         = scaler
     st.session_state['features']       = feats
-    st.subheader("📋 Recommendations")
-    st.dataframe(out)
-    st.download_button("Download CSV", out.to_csv(index=False), "recs.csv", "text/csv")
     # AI insights & next steps
     st.subheader("🤖 AI Insights & Next Steps")
     prompt = (
