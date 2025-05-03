@@ -469,7 +469,7 @@ elif selected == "📈 Budget Optimization":
         """
     )
 
-    # 1) Data input
+    # 1) Data input: either CSV upload or manual entry
     uploaded = st.file_uploader("Upload donor data CSV", type=["csv"])
     if uploaded:
         df_in = pd.read_csv(uploaded)
@@ -483,48 +483,37 @@ elif selected == "📈 Budget Optimization":
             m = st.number_input("Monetary (mL donated)", 0, 5000, 500)
             t = st.number_input("Time (months since first donation)", 1, 200, 12)
             a = st.number_input("Age (years)", 18, 100, 35)
-            c = st.selectbox("Responded to last campaign?", ["Yes","No"])
+            c = st.selectbox("Responded to last campaign?", ["Yes", "No"])
             if st.form_submit_button("Add donor"):
                 st.session_state.manual_opt.append({
-                    "Recency": r, "Frequency": f, "Monetary": m,
-                    "Time": t, "Age": a,
-                    "CampaignResponse": 1 if c=="Yes" else 0
+                    "Recency": r,
+                    "Frequency": f,
+                    "Monetary": m,
+                    "Time": t,
+                    "Age": a,
+                    "CampaignResponse": 1 if c == "Yes" else 0
                 })
                 st.success("Donor added!")
         df_in = pd.DataFrame(st.session_state.manual_opt)
 
     if df_in.empty:
-        st.info("Please upload or add at least one donor.")
+        st.info("Please upload a CSV or add at least one donor above.")
         st.stop()
 
     # 2) Preview & glossary
     st.subheader("Donation Data")
     st.dataframe(df_in)
     st.markdown(
-        "**Glossary:** Recency, Frequency, Monetary, Time, Age, CampaignResponse."
+        "**Glossary:** Recency, Frequency, Monetary, Time, Age, CampaignResponse"
     )
 
-    # 3) Re‐compute engineered features exactly as during training
-    
+    # 3) Feature engineering (must match exactly what the models were trained on)
     df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
     df_in["Donation_Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
-    df_in["Monetary_per_Freq"]     = df_in["Monetary"] / (df_in["Frequency"] + 1)
-    df_in["Intensity"]             = df_in["Frequency"] / (df_in["Recency"] + 1)
+    # (If you have other engineered features, compute them here too)
 
-    # 4) Validate that all required features are present
-    missing = [col for col in feats if col not in df_in.columns]
-    if missing:
-        st.error(f"Missing required features in input: {missing}. "
-                 "Please upload a CSV with these columns or add them manually above.")
-        st.stop()
-
-    df_in["Monetary_per_Freq"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
-    df_in["Intensity"]         = df_in["Frequency"] / (df_in["Recency"] + 1)
-    df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
-    df_in["Donation_Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
-    
-    # 4) Let user choose original vs advanced models
-    st.subheader("Choose Predictive Model")
+    # 4) Model‐set selection
+    st.subheader("Choose Predictive Model Set")
     choice = st.radio("Which model family?", ["Original Models", "Advanced Models"])
     if choice == "Original Models":
         models = st.session_state["basic_models"]
@@ -532,69 +521,71 @@ elif selected == "📈 Budget Optimization":
     else:
         models = st.session_state["advanced_models"]
         feats  = st.session_state["advanced_features"]
-    model_name = st.selectbox("Pick a model", list(models.keys()))
-    model      = models[model_name]
-    scaler     = st.session_state["scaler"]
 
     # 5) Validate that all required features are present
     missing = [col for col in feats if col not in df_in.columns]
     if missing:
-        st.error(f"Missing required features in input: {missing}. "
-                 "Please upload a CSV with these columns or add them manually above.")
+        st.error(f"Missing required features: {missing}. Please upload a CSV with these columns or add them manually.")
         st.stop()
 
-    # 6) Transform & predict
-    X_opt = scaler.transform(df_in[feats])
-    p_i   = model.predict_proba(X_opt)[:,1]
+    # 6) Scale & predict
+    scaler    = st.session_state["scaler"]
+    model_name = st.selectbox("Pick a model", list(models.keys()))
+    model      = models[model_name]
+    X_opt      = scaler.transform(df_in[feats])
+    p_i        = model.predict_proba(X_opt)[:, 1]
+
     df_opt = df_in.copy()
     df_opt["Predicted Probability"] = np.round(p_i, 3)
 
     st.subheader("Predicted Donation Probability")
     st.dataframe(df_opt)
 
-    # 7) Budget inputs
+    # 7) Budget & value inputs
     st.subheader("Budget & Value Settings")
-    v = st.number_input("Value per donation (USD)", 150)
-    c = st.number_input("Cost per contact (USD)", 1)
-    B = st.number_input("Total budget (USD)", 100)
+    v = st.number_input("Value per donation (USD)", value=150)
+    c = st.number_input("Cost per contact (USD)", value=1)
+    B = st.number_input("Total budget (USD)", value=100)
 
-    # 8) Optimization
-    n = len(df_opt)
+    # 8) Build & solve the optimization problem
+    n       = len(df_opt)
     prob_lp = LpProblem("donor_alloc", LpMaximize)
     x_vars  = [LpVariable(f"x_{i}", cat=LpBinary) for i in range(n)]
-    prob_lp += lpSum([x_vars[i]*(p_i[i]*v - c) for i in range(n)])
-    prob_lp += lpSum([x_vars[i]*c for i in range(n)]) <= B
+
+    # Objective: maximize expected return minus cost
+    prob_lp += lpSum([x_vars[i] * (p_i[i] * v - c) for i in range(n)])
+    # Budget constraint
+    prob_lp += lpSum([x_vars[i] * c for i in range(n)]) <= B
     prob_lp.solve()
 
-    df_opt["Contact"]    = [int(x_vars[i].value()) for i in range(n)]
-    df_opt["Exp Return"] = np.round(df_opt["Predicted Probability"] * v, 2)
+    df_opt["Contact"]      = [int(x_vars[i].value()) for i in range(n)]
+    df_opt["Expected Return"] = np.round(df_opt["Predicted Probability"] * v, 2)
 
-    # 9) Display results
+    # 9) Display optimization results
     st.subheader("Optimization Results")
-    st.markdown("**Contact = 1** → reach out to these donors")
+    st.markdown("**Contact = 1** → Reach out to these donors")
     st.dataframe(df_opt)
-    st.metric("Total Expected Return", f"${df_opt.loc[df_opt.Contact==1,'Exp Return'].sum():.2f}")
-    st.metric("Total Contact Cost",   f"${df_opt.Contact.sum()*c:.2f}")
-    st.metric("Donors Selected",       int(df_opt.Contact.sum()))
+    st.metric("Total Expected Return (USD)", f"{df_opt.loc[df_opt.Contact == 1, 'Expected Return'].sum():.2f}")
+    st.metric("Total Contact Cost (USD)", f"{df_opt.Contact.sum() * c:.2f}")
+    st.metric("Number of Donors Selected", int(df_opt.Contact.sum()))
 
     st.download_button(
-        "Download Results CSV",
+        "📥 Download Results CSV",
         df_opt.to_csv(index=False),
         file_name="optimization_results.csv",
         mime="text/csv"
     )
 
     # 10) AI‐Generated Strategy Insights
-    st.subheader("AI-Generated Strategy Insights")
+    st.subheader("🤖 AI-Generated Strategy Insights")
     ai_prompt = (
-        "You are a nonprofit fundraising strategist reviewing the donor optimization results below:\n\n"
+        "You are a nonprofit fundraising strategist reviewing these optimization results:\n\n"
         f"{df_opt.to_csv(index=False)}\n\n"
         "Please present your analysis in three clearly labeled sections:\n"
-        "1. **Key Findings:** 2–3 bullet points summarizing the most important insights.\n"
-        "2. **What This Means:** A brief, non-technical explanation of how these results impact our outreach strategy.\n"
-        "3. **Recommendations:** 2–3 actionable, easy-to-understand steps we should take next.\n\n"
-        "Write in a conversational style that anyone on the team can follow."
+        "1. **Key Findings:** 2–3 bullet points of the most important insights.\n"
+        "2. **What This Means:** A brief, non-technical explanation.\n"
+        "3. **Recommendations:** 2–3 actionable steps, each with a short rationale and expected impact.\n"
+        "Write in a conversational style anyone can follow."
     )
     insight = get_gpt_insight(ai_prompt)
     st.info(insight)
-
