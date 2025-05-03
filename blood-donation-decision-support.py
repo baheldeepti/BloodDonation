@@ -233,7 +233,6 @@ elif selected == "🤖 Modeling & Recommendations":
     st.pyplot(plt)
 
     # 8) Show comparison table
-    # 8) Show comparison table
     st.subheader("📋 Model Comparison")
     
     df_res = (
@@ -253,69 +252,26 @@ elif selected == "🤖 Modeling & Recommendations":
     )
     
     st.dataframe(styled)
-        st.subheader("📋 Model Comparison")
-        df_res = pd.DataFrame(results).sort_values('ROC AUC', ascending=False).reset_index(drop=True)
-        st.dataframe(df_res)
+    st.subheader("📋 Model Comparison")
+    df_res = pd.DataFrame(results).sort_values('ROC AUC', ascending=False).reset_index(drop=True)
+    st.dataframe(df_res)
 
     # 9) Persist for optimization page
     st.session_state['trained_models'] = trained_models
     st.session_state['scaler']         = scaler
     st.session_state['features']       = feats
-
-    
-    # Data input: CSV upload or manual
-    st.subheader("🔄 Data Input & Personalized Recommendations")
-    uploaded = st.file_uploader("Upload donor data CSV", type=['csv'])
-    if uploaded:
-        df_csv = pd.read_csv(uploaded)
-        st.session_state['manual_entries'] = df_csv.to_dict('records')
-        st.success("CSV loaded!")
-    if 'manual_entries' not in st.session_state:
-        st.session_state['manual_entries'] = []
-    with st.form("entry_form", clear_on_submit=True):
-        r = st.number_input('Recency',0,50,10)
-        f = st.number_input('Frequency',1,10,2)
-        m = st.number_input('Monetary',0,2000,500)
-        t = st.number_input('Time',1,100,12)
-        a = st.number_input('Age',18,100,35)
-        c = st.selectbox('CampaignResponse',['Yes','No'])
-        if st.form_submit_button("Add"):
-            st.session_state['manual_entries'].append({
-                'Recency':r,'Frequency':f,'Monetary':m,
-                'Time':t,'Age':a,'CampaignResponse':1 if c=='Yes' else 0
-            })
-            st.success("Entry added!")
-
-    df_new = pd.DataFrame(st.session_state['manual_entries'])
-    if df_new.empty:
-        st.info("No data: upload CSV or add entries above.")
-    else:
-        df_new['Monetary_per_Freq'] = df_new['Monetary']/(df_new['Frequency']+1)
-        df_new['Intensity'] = df_new['Frequency']/(df_new['Recency']+1)
-        Xn = scaler.transform(df_new[feats])
-        out = df_new.copy()
-        for name, mdl in trained.items():
-            prob = mdl.predict_proba(Xn)[:,1]
-            conditions = [prob>0.7, (prob>0.4)&(prob<=0.7)]
-            choices = ['SMS','Email']
-            rec = np.select(conditions, choices, default='Deprioritize')
-            out[f'Prob_{name}'] = np.round(prob,3)
-            out[f'Rec_{name}'] = rec
-            out[f'Value_{name}'] = np.round(prob*150,2)
-
-        st.subheader("📋 Recommendations")
-        st.dataframe(out)
-        st.download_button("Download CSV", out.to_csv(index=False), "recs.csv", "text/csv")
-
-        # AI insights & next steps
-        st.subheader("🤖 AI Insights & Next Steps")
-        prompt = (
-            "Senior data scientist with 20 yrs exp. Given:\n\n"
-            f"{df_res.to_csv(index=False)}\n\n"
-            f"Confusion Matrix ({best_model}): {cm.tolist()}\n\n"
-            "Recommend best model and business cases where which model would fit best and recommendations"
-        )
-        st.info(get_gpt_insight(prompt))
+    st.subheader("📋 Recommendations")
+    st.dataframe(out)
+    st.download_button("Download CSV", out.to_csv(index=False), "recs.csv", "text/csv")
+    # AI insights & next steps
+    st.subheader("🤖 AI Insights & Next Steps")
+    prompt = (
+        "Senior data scientist with 20 yrs exp. Given:\n\n"
+        f"{df_res.to_csv(index=False)}\n\n"
+        f"Confusion Matrix ({best_model}): {cm.tolist()}\n\n"
+        "Recommend best model and business cases where which model would fit best and recommendations"
+    )
+    st.info(get_gpt_insight(prompt))
 
 # --- PAGE 5: CAMPAIGN BUDGET OPTIMIZATION ---
 elif selected == "📈 Budget Optimization":
