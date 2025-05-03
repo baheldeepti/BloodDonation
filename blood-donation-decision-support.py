@@ -151,9 +151,7 @@ elif selected == "🤖 Modeling & Recommendations":
     2. Multicollinearity check  
     3. Train models & ensembles  
     4. ROC & confusion matrix  
-    5. Upload CSV or add manual entries  
-    6. Personalized outreach recommendations  
-    7. AI insights & next steps  
+    5. AI insights & next steps  
     """)
 
     # 1) Load & engineer features
