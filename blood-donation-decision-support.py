@@ -505,9 +505,24 @@ elif selected == "📈 Budget Optimization":
     )
 
     # 3) Re‐compute engineered features exactly as during training
+    
+    df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+    df_in["Donation_Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
+    df_in["Monetary_per_Freq"]     = df_in["Monetary"] / (df_in["Frequency"] + 1)
+    df_in["Intensity"]             = df_in["Frequency"] / (df_in["Recency"] + 1)
+
+    # 4) Validate that all required features are present
+    missing = [col for col in feats if col not in df_in.columns]
+    if missing:
+        st.error(f"Missing required features in input: {missing}. "
+                 "Please upload a CSV with these columns or add them manually above.")
+        st.stop()
+
     df_in["Monetary_per_Freq"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
     df_in["Intensity"]         = df_in["Frequency"] / (df_in["Recency"] + 1)
-
+    df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+    df_in["Donation_Intensity"]    = df_in["Frequency"] / (df_in["Recency"] + 1)
+    
     # 4) Let user choose original vs advanced models
     st.subheader("Choose Predictive Model")
     choice = st.radio("Which model family?", ["Original Models", "Advanced Models"])
