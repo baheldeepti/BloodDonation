@@ -505,7 +505,10 @@ elif selected == "📈 Budget Optimization":
 
     # 3) Recompute only the two features models expect
     df_in["Monetary_per_Freq"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+    df_in["Monetary_per_Donation"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
     df_in["Intensity"]         = df_in["Frequency"] / (df_in["Recency"] + 1)
+    df_in["Donation_Intensity"]         = df_in["Frequency"] / (df_in["Recency"] + 1)
+
 
     # 4) Model-set selection
     st.subheader("Choose Predictive Model Set")
