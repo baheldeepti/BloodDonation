@@ -260,20 +260,197 @@ elif selected == "🤖 Modeling & Recommendations":
     st.session_state['trained_models'] = trained_models
     st.session_state['scaler']         = scaler
     st.session_state['features']       = feats
-    # AI insights & next steps
-    st.subheader("🤖 AI Insights & Next Steps")
-    prompt = (
-        "You are a Senior Data Scientist with 20 years of experience. Given the following model comparison results:\n\n"
-        f"{df_res.to_csv(index=False)}\n\n"
-        "1) **Model Use Cases**: Present a markdown table with two columns—`Model` and `Best Use Case`—"
-        "mapping each model to the outreach scenario it’s best suited for.\n\n"
-        "2) **Recommendations**: Under this heading, list 2–3 bullet points. For each bullet, include:\n"
-        "   - **Recommendation:** The action to take.\n"
-        "   - **Why:** The rationale behind it.\n"
-        "   - **Impact:** The expected benefit for our donor outreach strategy.\n\n"
-        "Format everything clearly in markdown so it’s easy to read and share."
+
+    # --- Advanced Hyperparameter Tuning & Ensembling ---
+
+    # 4. Train/Test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, stratify=y, test_size=0.3, random_state=42
     )
-    st.info(get_gpt_insight(prompt))
+    
+    # 5. Define models & hyperparameter grids
+    model_params = {
+        'Logistic Regression': (
+            LogisticRegression(max_iter=1000),
+            {'classifier__C': [0.1, 1, 10]}
+        ),
+        'Random Forest': (
+            RandomForestClassifier(),
+            {'classifier__n_estimators': [100], 'classifier__max_depth': [5, 15]}
+        ),
+        'Gradient Boosting': (
+            GradientBoostingClassifier(),
+            {'classifier__n_estimators': [100], 'classifier__learning_rate': [0.05, 0.1]}
+        ),
+        'AdaBoost': (
+            AdaBoostClassifier(),
+            {'classifier__n_estimators': [100, 200]}
+        ),
+        'XGBoost': (
+            XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+            {'classifier__n_estimators': [100], 'classifier__max_depth': [3, 5]}
+        ),
+        'SVM': (
+            SVC(probability=True),
+            {'classifier__C': [0.1, 1], 'classifier__kernel': ['rbf']}
+        ),
+        'Naive Bayes': (
+            GaussianNB(),
+            {}  # no hyperparameters
+        )
+    }
+    
+    results = []
+    trained_models = {}
+    
+    # 6. Train, tune, CV-evaluate, and test-evaluate each model
+    for name, (estimator, params) in model_params.items():
+        # Build pipeline with scaler + estimator
+        pipe = Pipeline([
+            ('scaler', StandardScaler()),
+            ('classifier', estimator)
+        ])
+        
+        if params:
+            grid = GridSearchCV(
+                pipe, params, cv=5, scoring='roc_auc', n_jobs=-1
+            )
+            grid.fit(X_train, y_train)
+            best_model = grid.best_estimator_
+            cv_auc     = grid.best_score_
+        else:
+            pipe.fit(X_train, y_train)
+            best_model = pipe
+            cv_auc     = cross_val_score(
+                pipe, X_train, y_train, cv=5, scoring='roc_auc', n_jobs=-1
+            ).mean()
+        
+        trained_models[name] = best_model
+        
+        # Test set evaluation
+        y_pred = best_model.predict(X_test)
+        if hasattr(best_model.named_steps['classifier'], "predict_proba"):
+            y_proba = best_model.predict_proba(X_test)[:, 1]
+        else:
+            # fallback if no predict_proba
+            y_proba = best_model.decision_function(X_test)
+        
+        results.append({
+            'Model':          name,
+            'CV ROC AUC':     round(cv_auc, 4),
+            'Test Accuracy':  round(accuracy_score(y_test, y_pred), 4),
+            'Test Precision': round(precision_score(y_test, y_pred), 4),
+            'Test Recall':    round(recall_score(y_test, y_pred), 4),
+            'Test F1 Score':  round(f1_score(y_test, y_pred), 4),
+            'Test ROC AUC':   round(roc_auc_score(y_test, y_proba), 4)
+        })
+    
+    # 7. Build a Voting Ensemble of top 3 by CV ROC AUC
+    top3 = sorted(results, key=lambda x: x['CV ROC AUC'], reverse=True)[:3]
+    ensemble = VotingClassifier(
+        estimators=[(r['Model'], trained_models[r['Model']]) for r in top3],
+        voting='soft'
+    )
+    ensemble_pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', ensemble)
+    ])
+    ensemble_pipe.fit(X_train, y_train)
+    
+    # Ensemble test evaluation
+    y_pred_e   = ensemble_pipe.predict(X_test)
+    y_proba_e  = ensemble_pipe.predict_proba(X_test)[:, 1]
+    ensemble_cv_auc = cross_val_score(
+        ensemble_pipe, X, y, cv=StratifiedKFold(5, shuffle=True, random_state=42),
+        scoring='roc_auc', n_jobs=-1
+    ).mean()
+    
+    results.append({
+        'Model':          'Voting Ensemble',
+        'CV ROC AUC':     round(ensemble_cv_auc,    4),
+        'Test Accuracy':  round(accuracy_score(y_test, y_pred_e), 4),
+        'Test Precision': round(precision_score(y_test, y_pred_e), 4),
+        'Test Recall':    round(recall_score(y_test, y_pred_e),    4),
+        'Test F1 Score':  round(f1_score(y_test, y_pred_e),        4),
+        'Test ROC AUC':   round(roc_auc_score(y_test, y_proba_e),  4)
+    })
+    
+    # 8. Display final results
+    df_results = (
+        pd.DataFrame(results)
+          .sort_values(by='CV ROC AUC', ascending=False)
+          .reset_index(drop=True)
+    )
+    
+    st.subheader("📊 Advanced Tuning & Ensembling Results")
+    df_results = (
+    pd.DataFrame(results)
+      .sort_values(by='CV ROC AUC', ascending=False)
+      .reset_index(drop=True)
+)
+
+    
+    # Define which columns to color‐code
+    metrics = [
+        'CV ROC AUC',
+        'Test Accuracy',
+        'Test Precision',
+        'Test Recall',
+        'Test F1 Score',
+        'Test ROC AUC'
+    ]
+    
+    # Apply a green gradient to the metric columns,
+    # highlight the best in light green and worst in salmon
+    styled = (
+        df_results.style
+                  .background_gradient(subset=metrics, cmap='Greens')
+                  .highlight_max(subset=metrics, color='lightgreen')
+                  .highlight_min(subset=metrics, color='salmon')
+    )
+    
+    st.dataframe(styled)
+    # 9. Plot ROC Curves for All Models
+    fig, ax = plt.subplots(figsize=(10, 8))
+    for name, model in trained_models.items():
+        if hasattr(model.named_steps['classifier'], "predict_proba"):
+            y_prob = model.predict_proba(X_test)[:, 1]
+        else:
+            y_prob = model.decision_function(X_test)
+        fpr, tpr, _ = roc_curve(y_test, y_prob)
+        ax.plot(fpr, tpr, lw=2, label=f"{name} (AUC = {auc(fpr, tpr):.2f})")
+    
+    # Ensemble curve
+    fpr_e, tpr_e, _ = roc_curve(y_test, y_proba_e)
+    ax.plot(fpr_e, tpr_e, '--', lw=2, label=f"Voting Ensemble (AUC = {auc(fpr_e, tpr_e):.2f})")
+    
+    ax.plot([0, 1], [0, 1], 'k--', lw=1)
+    ax.set_xlim([0, 1]); ax.set_ylim([0, 1.05])
+    ax.set_xlabel('False Positive Rate'); ax.set_ylabel('True Positive Rate')
+    ax.set_title('ROC Curves for All Models')
+    ax.legend(loc='lower right')
+    st.pyplot(fig)
+    
+    
+    # --- AI-Generated Model Comparison & Recommendations ---
+    st.subheader("🤖 AI Model Comparison & Recommendations")
+    ai_prompt = (
+        "You are a Senior Data Scientist with 20 years of experience. "
+        "Below are two tables: the basic-model results (in df_res) and the advanced "
+        "tuning & ensembling results (in df_results).\n\n"
+        f"Basic Models:\n{df_res.to_csv(index=False)}\n\n"
+        f"Tuned & Ensemble Models:\n{df_results.to_csv(index=False)}\n\n"
+        "1) **Use Case Table**: Provide a markdown table with columns `Model` and `Best Use Case` "
+        "describing the ideal donor outreach scenario for each model.\n\n"
+        "2) **Recommendations**: List 2–3 bullet points. For each bullet, include:\n"
+        "- **Recommendation:** The action to take.\n"
+        "- **Why:** The rationale.\n"
+        "- **Impact:** The expected benefit for our donor outreach strategy.\n\n"
+        "Format everything in clear markdown."
+    )
+    st.info(get_gpt_insight(ai_prompt))
+    
+
 
 
 
