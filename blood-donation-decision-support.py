@@ -455,13 +455,14 @@ elif selected == "🤖 Modeling & Recommendations":
 
     st.info(get_gpt_insight(ai_prompt))
     # --- PAGE 4: CAMPAIGN BUDGET OPTIMIZATION ---
+# --- PAGE 5: CAMPAIGN BUDGET OPTIMIZATION ---
 elif selected == "📈 Budget Optimization":
     st.title("📈 Campaign Budget Optimization")
     st.markdown(
         """
         **What is this?**  
-        Choose a predictive model, set your budget, and let the optimizer tell you which donors to contact
-        for the best expected return.
+        This tool helps you decide *which* donors to contact given a fixed outreach budget, 
+        so you maximize your *expected* donation return.
 
         **Where does donor data come from?**  
         Upload a CSV here or enter donors one‐by‐one below.
@@ -503,11 +504,11 @@ elif selected == "📈 Budget Optimization":
         "**Glossary:** Recency, Frequency, Monetary, Time, Age, CampaignResponse."
     )
 
-    # 3) Feature engineering
-    df_in["Monetary_per_Freq"] = df_in["Monetary"]/(df_in["Frequency"]+1)
-    df_in["Intensity"] = df_in["Frequency"]/(df_in["Recency"]+1)
+    # 3) Re‐compute engineered features exactly as during training
+    df_in["Monetary_per_Freq"] = df_in["Monetary"] / (df_in["Frequency"] + 1)
+    df_in["Intensity"]         = df_in["Frequency"] / (df_in["Recency"] + 1)
 
-    # 4) Model‐set selection
+    # 4) Let user choose original vs advanced models
     st.subheader("Choose Predictive Model")
     choice = st.radio("Which model family?", ["Original Models", "Advanced Models"])
     if choice == "Original Models":
@@ -516,27 +517,33 @@ elif selected == "📈 Budget Optimization":
     else:
         models = st.session_state["advanced_models"]
         feats  = st.session_state["advanced_features"]
-
     model_name = st.selectbox("Pick a model", list(models.keys()))
     model      = models[model_name]
     scaler     = st.session_state["scaler"]
 
-    # 5) Predict probabilities
+    # 5) Validate that all required features are present
+    missing = [col for col in feats if col not in df_in.columns]
+    if missing:
+        st.error(f"Missing required features in input: {missing}. "
+                 "Please upload a CSV with these columns or add them manually above.")
+        st.stop()
+
+    # 6) Transform & predict
     X_opt = scaler.transform(df_in[feats])
     p_i   = model.predict_proba(X_opt)[:,1]
     df_opt = df_in.copy()
-    df_opt["Pred Prob"] = np.round(p_i,3)
+    df_opt["Predicted Probability"] = np.round(p_i, 3)
 
     st.subheader("Predicted Donation Probability")
     st.dataframe(df_opt)
 
-    # 6) Budget inputs
+    # 7) Budget inputs
     st.subheader("Budget & Value Settings")
     v = st.number_input("Value per donation (USD)", 150)
     c = st.number_input("Cost per contact (USD)", 1)
     B = st.number_input("Total budget (USD)", 100)
 
-    # 7) Optimization
+    # 8) Optimization
     n = len(df_opt)
     prob_lp = LpProblem("donor_alloc", LpMaximize)
     x_vars  = [LpVariable(f"x_{i}", cat=LpBinary) for i in range(n)]
@@ -544,10 +551,10 @@ elif selected == "📈 Budget Optimization":
     prob_lp += lpSum([x_vars[i]*c for i in range(n)]) <= B
     prob_lp.solve()
 
-    df_opt["Contact"] = [int(x_vars[i].value()) for i in range(n)]
-    df_opt["Exp Return"] = np.round(df_opt["Pred Prob"]*v,2)
+    df_opt["Contact"]    = [int(x_vars[i].value()) for i in range(n)]
+    df_opt["Exp Return"] = np.round(df_opt["Predicted Probability"] * v, 2)
 
-    # 8) Show results
+    # 9) Display results
     st.subheader("Optimization Results")
     st.markdown("**Contact = 1** → reach out to these donors")
     st.dataframe(df_opt)
@@ -561,3 +568,18 @@ elif selected == "📈 Budget Optimization":
         file_name="optimization_results.csv",
         mime="text/csv"
     )
+
+    # 10) AI‐Generated Strategy Insights
+    st.subheader("AI-Generated Strategy Insights")
+    ai_prompt = (
+        "You are a nonprofit fundraising strategist reviewing the donor optimization results below:\n\n"
+        f"{df_opt.to_csv(index=False)}\n\n"
+        "Please present your analysis in three clearly labeled sections:\n"
+        "1. **Key Findings:** 2–3 bullet points summarizing the most important insights.\n"
+        "2. **What This Means:** A brief, non-technical explanation of how these results impact our outreach strategy.\n"
+        "3. **Recommendations:** 2–3 actionable, easy-to-understand steps we should take next.\n\n"
+        "Write in a conversational style that anyone on the team can follow."
+    )
+    insight = get_gpt_insight(ai_prompt)
+    st.info(insight)
+
