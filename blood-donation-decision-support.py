@@ -47,8 +47,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Define tab options once
 tabs = [
-    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization", 
-       "🎙️ Voice Assistant"
+    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization"
 ]
 
 # Safely get the index for the default tab
