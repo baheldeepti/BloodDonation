@@ -68,7 +68,7 @@ from openai import OpenAI
 try:
     api_key = st.secrets["OPENAI_API_KEY"]
 except Exception:
-    st.stop()  # Stops Streamlit with a silent fail instead of a crash
+    st.stop()
     raise ValueError("❌ Missing OPENAI_API_KEY in secrets")
 
 client = OpenAI(api_key=api_key)
@@ -82,6 +82,7 @@ def get_gpt_insight(prompt: str) -> str:
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"❌ OpenAI error: {e}"
+
 
 
 # --- Added load_data function ---
