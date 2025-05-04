@@ -63,7 +63,15 @@ st.session_state.selected_tab = selected
 
 
 # OpenAI insight generator
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+from openai import OpenAI
+
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    st.stop()  # Stops Streamlit with a silent fail instead of a crash
+    raise ValueError("❌ Missing OPENAI_API_KEY in secrets")
+
+client = OpenAI(api_key=api_key)
 
 def get_gpt_insight(prompt: str) -> str:
     try:
