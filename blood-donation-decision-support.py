@@ -36,6 +36,7 @@ import plotly.express as px
 import openai
 from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
 
+import soundfile as sf
 
 # Streamlit page configuration
 st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
@@ -67,6 +68,12 @@ def get_gpt_insight(prompt: str) -> str:
         messages=[{"role": "user", "content": prompt}]
     )
     return resp.choices[0].message.content.strip()
+
+# --- Added load_data function ---
+@st.cache_data
+def load_data():
+    url = "https://raw.githubusercontent.com/baheldeepti/BloodDonation/main/Balanced_Blood_Donation_Dataset.csv"
+    return pd.read_csv(url)
 
 # --- PAGE 1: INTRODUCTION ---
 if selected == "🏠 Overview":
