@@ -47,7 +47,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Define tab options once
 tabs = [
-    "🏠 Overview", "📊 Exploratory Analysis", "📊 Interactive Dashboard", "🤖 Modeling & Recommendations", "📈 Budget Optimization", "🔁 What-If Scenario", 
+    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization", "🔁 What-If Scenario", 
      "💬 Conversational Chatbot",
     "🎙️ Voice Assistant"
 ]
@@ -63,19 +63,14 @@ st.session_state.selected_tab = selected
 
 
 # OpenAI insight generator
-import openai
-
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
+@st.cache_data
 def get_gpt_insight(prompt: str) -> str:
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"❌ OpenAI error: {e}"
+    openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
+    resp = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return resp.choices[0].message.content.strip()
 
 
 
@@ -142,13 +137,11 @@ elif selected == "📊 Exploratory Analysis":
         target_counts = df['Target'].value_counts().rename_axis('Target').reset_index(name='Count')
         fig2 = px.bar(target_counts, x='Target', y='Count', title='Repeat Donation Counts')
         st.plotly_chart(fig2, use_container_width=True)
-
-    # Correlation heatmap
-    st.subheader("🔍 Correlation Heatmap")
-    corr_mat = df.corr()
-    fig3, ax3 = plt.subplots(figsize=(8, 6))
-    sns.heatmap(corr_mat, annot=True, fmt='.2f', cmap='coolwarm', ax=ax3)
-    st.pyplot(fig3)
+        
+    #Donation volumne by campaign response
+    st.subheader("📊 Donation Volume by Campaign Response")
+    fig3 = px.box(df, x="CampaignResponse", y="Monetary", color="Target", title="Donation Volume")
+    st.plotly_chart(fig3, use_container_width=True)
 
     # Boxplots by target
     st.subheader("📊 Boxplots by Donation Outcome")
@@ -672,25 +665,9 @@ elif selected == "🔁 What-If Scenario":
     else:
         st.warning("Model not loaded. Run the Modeling page first.")
 
-# 📊 Interactive Dashboard
-elif selected == "📊 Interactive Dashboard":
-    st.header("📊 Explore Donor Dataset")
-    df = load_data()
 
-    st.subheader("📈 Plot: Frequency vs Monetary by Target")
-    fig = px.scatter(
-        df, x="Frequency", y="Monetary", color=df["Target"].map({0: "No", 1: "Yes"}),
-        title="Donation Frequency vs Volume Colored by Repeat Donation"
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("📊 Recency Distribution")
-    fig2 = px.histogram(df, x="Recency", color="Target", barmode="overlay", nbins=30)
-    st.plotly_chart(fig2, use_container_width=True)
 
-    st.subheader("📊 Donation Volume by Campaign Response")
-    fig3 = px.box(df, x="CampaignResponse", y="Monetary", color="Target", title="Donation Volume")
-    st.plotly_chart(fig3, use_container_width=True)
 
 
 # Voice Assistant Tab
