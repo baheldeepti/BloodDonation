@@ -663,11 +663,10 @@ elif section == "📊 Interactive Dashboard":
 
     st.subheader("📈 Plot: Frequency vs Monetary by Target")
 
-# 🎙️ Voice Assistant Tab
-if selected == "🎙️ Voice Assistant":
-    st.header("🎙️ Speak Now: Mic Input with Whisper + GPT")
+# Voice Assistant Tab
+if selected == "🎧 Voice Assistant":
+    st.header("🎧 Speak Now: Mic Input with Whisper + GPT")
 
-    # Load Whisper model once
     @st.cache_resource
     def load_whisper_model():
         return whisper.load_model("base")
@@ -714,6 +713,3 @@ if selected == "🎙️ Voice Assistant":
                     st.error(f"GPT processing failed: {e}")
         else:
             st.warning("No audio recorded yet.")
-
-    fig = px.scatter(df, x='Frequency', y='Monetary', color=df['Target'].map({0:'No',1:'Yes'}))
-    st.plotly_chart(fig, use_container_width=True)
