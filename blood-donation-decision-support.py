@@ -66,7 +66,7 @@ st.session_state.selected_tab = selected
 from openai import OpenAI
 
 try:
-    api_key = st.secrets["OPENAI_API_KEY"]
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
 except Exception:
     st.stop()
     raise ValueError("❌ Missing OPENAI_API_KEY in secrets")
