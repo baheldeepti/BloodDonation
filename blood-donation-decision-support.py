@@ -43,21 +43,24 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Navigation menu using Streamlit's native radio buttons
 # Add tab to Streamlit sidebar navigation
-if 'selected_tab' not in st.session_state:
-    st.session_state.selected_tab = "🏠 Overview"
 
-selected = st.sidebar.radio(
-    "Go to",
-    [
-        "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
-        "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
-        "🎙️ Voice Assistant"
-    ],
-    index=[
-        "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
-        "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
-        "🎙️ Voice Assistant"
-    ].index(st.session_state.selected_tab)
+
+# Define tab options once
+tabs = [
+    "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
+    "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
+    "🎙️ Voice Assistant"
+]
+
+# Safely get the index for the default tab
+default_index = tabs.index(st.session_state.get("selected_tab", "🏠 Overview"))
+
+# Render sidebar radio button
+selected = st.sidebar.radio("Go to", tabs, index=default_index)
+
+# Persist selected tab in session state
+st.session_state.selected_tab = selected
+
 
 # OpenAI insight generator
 @st.cache_data
