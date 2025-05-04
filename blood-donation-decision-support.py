@@ -48,8 +48,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 # Define tab options once
 tabs = [
     "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization", 
-     "💬 Conversational Chatbot",
-    "🎙️ Voice Assistant"
+       "🎙️ Voice Assistant"
 ]
 
 # Safely get the index for the default tab
@@ -648,7 +647,7 @@ elif selected == "💬 Conversational Chatbot":
 
 
 # Voice Assistant Tab
-if selected == "🎧 Voice Assistant":
+elif selected == "🎧 Voice Assistant":
     st.header("🎧 Speak Now: Mic Input with Whisper + GPT")
 
     @st.cache_resource
