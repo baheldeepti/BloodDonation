@@ -47,8 +47,8 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Define tab options once
 tabs = [
-    "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
-    "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
+    "🏠 Overview", "📊 Exploratory Analysis", "📊 Interactive Dashboard", "🤖 Modeling & Recommendations", "📈 Budget Optimization", "🔁 What-If Scenario", 
+     "💬 Conversational Chatbot",
     "🎙️ Voice Assistant"
 ]
 
@@ -63,14 +63,19 @@ st.session_state.selected_tab = selected
 
 
 # OpenAI insight generator
-@st.cache_data
 def get_gpt_insight(prompt: str) -> str:
-    openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
-    resp = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return resp.choices[0].message.content.strip()
+    import openai
+    openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message["content"].strip()
+    except Exception as e:
+        return f"❌ OpenAI error: {e}"
+
 
 # --- Added load_data function ---
 @st.cache_data
@@ -668,10 +673,22 @@ elif selected == "🔁 What-If Scenario":
 elif selected == "📊 Interactive Dashboard":
     st.header("📊 Explore Donor Dataset")
     df = load_data()
-    st.subheader("Interactive Data Grid")
-    AgGrid(df, editable=False, fit_columns_on_grid_load=True)
 
     st.subheader("📈 Plot: Frequency vs Monetary by Target")
+    fig = px.scatter(
+        df, x="Frequency", y="Monetary", color=df["Target"].map({0: "No", 1: "Yes"}),
+        title="Donation Frequency vs Volume Colored by Repeat Donation"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("📊 Recency Distribution")
+    fig2 = px.histogram(df, x="Recency", color="Target", barmode="overlay", nbins=30)
+    st.plotly_chart(fig2, use_container_width=True)
+
+    st.subheader("📊 Donation Volume by Campaign Response")
+    fig3 = px.box(df, x="CampaignResponse", y="Monetary", color="Target", title="Donation Volume")
+    st.plotly_chart(fig3, use_container_width=True)
+
 
 # Voice Assistant Tab
 if selected == "🎧 Voice Assistant":
