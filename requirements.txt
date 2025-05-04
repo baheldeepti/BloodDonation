@@ -7,7 +7,7 @@ streamlit-webrtc
 av
 soundfile
 prophet
-st-aggrid
+streamlit-aggrid  
 matplotlib
 seaborn
 scikit-learn
