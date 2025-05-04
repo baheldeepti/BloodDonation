@@ -138,10 +138,7 @@ elif selected == "📊 Exploratory Analysis":
         fig2 = px.bar(target_counts, x='Target', y='Count', title='Repeat Donation Counts')
         st.plotly_chart(fig2, use_container_width=True)
         
-    #Donation volumne by campaign response
-    st.subheader("📊 Donation Volume by Campaign Response")
-    fig3 = px.box(df, x="CampaignResponse", y="Monetary", color="Target", title="Donation Volume")
-    st.plotly_chart(fig3, use_container_width=True)
+  
 
     # Boxplots by target
     st.subheader("📊 Boxplots by Donation Outcome")
