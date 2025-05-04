@@ -4,6 +4,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import whisper
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, ClientSettings
+import av
+import tempfile
+from prophet import Prophet
+from st_aggrid import AgGrid
 import os
 import zipfile
 import matplotlib.pyplot as plt
@@ -35,12 +41,22 @@ from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
 st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Navigation menu using Streamlit's native radio buttons
-st.sidebar.title("Navigation")
+# Add tab to Streamlit sidebar navigation
+if 'selected_tab' not in st.session_state:
+    st.session_state.selected_tab = "🏠 Overview"
+
 selected = st.sidebar.radio(
     "Go to",
-    ["🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization"]
-)
-
+    [
+        "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
+        "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
+        "🎙️ Voice Assistant"
+    ],
+    index=[
+        "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations", "📈 Budget Optimization",
+        "📅 Donation Forecasting", "💬 Conversational Chatbot", "🔁 What-If Scenario", "📊 Interactive Dashboard",
+        "🎙️ Voice Assistant"
+    ].index(st.session_state.selected_tab)
 
 # OpenAI insight generator
 @st.cache_data
@@ -583,3 +599,121 @@ elif selected == "📈 Budget Optimization":
         "Write conversationally for non-technical readers."
     )
     st.info(get_gpt_insight(ai_prompt))
+
+# 📅 Donation Forecasting
+elif section == "📅 Donation Forecasting":
+    st.header("📅 Forecasting Monthly Donation Volume")
+    df = load_data()
+    df['ds'] = pd.date_range(start='2022-01-01', periods=len(df), freq='MS')
+    monthly = df.groupby(df['ds'].dt.to_period("M"))['Monetary'].sum().reset_index()
+    monthly.columns = ['ds', 'y']
+    monthly['ds'] = monthly['ds'].dt.to_timestamp()
+
+    model = Prophet()
+    model.fit(monthly)
+    future = model.make_future_dataframe(periods=6, freq='M')
+    forecast = model.predict(future)
+
+    fig1 = model.plot(forecast)
+    st.pyplot(fig1)
+
+# 💬 Conversational Chatbot
+elif section == "💬 Conversational Chatbot":
+    st.header("💬 AI Assistant Chatbot")
+    user_input = st.text_input("Ask a question about donors, predictions, or campaigns:")
+    if user_input:
+        response = get_gpt_insight(
+            f"You are a Blood Donation DSS assistant. Respond to: {user_input}"
+        )
+        st.success(response)
+
+# 🔁 What-If Scenario
+elif section == "🔁 What-If Scenario":
+    st.header("🔁 Simulate Donor Scenario")
+    rec = st.slider("Recency", 0, 100, 10)
+    freq = st.slider("Frequency", 0, 20, 5)
+    mon = st.slider("Monetary (mL)", 100, 2000, 500)
+    age = st.slider("Age", 18, 65, 35)
+    donor = pd.DataFrame([{
+        "Recency": rec, "Frequency": freq, "Monetary": mon,
+        "Time": 30, "Age": age, "CampaignResponse": 1,
+        "Monetary_per_Freq": mon / (freq + 1),
+        "Intensity": freq / (rec + 1)
+    }])
+
+    st.subheader("Donor Input")
+    st.dataframe(donor)
+
+    if "advanced_models" in st.session_state:
+        model = st.session_state["advanced_models"].get("Voting Ensemble")
+        scaler = st.session_state["scaler"]
+        feats = st.session_state["advanced_features"]
+        X_sim = scaler.transform(donor[feats])
+        prob = model.predict_proba(X_sim)[0][1]
+        st.metric("Predicted Repeat Donation Probability", f"{prob:.2%}")
+    else:
+        st.warning("Model not loaded. Run the Modeling page first.")
+
+# 📊 Interactive Dashboard
+elif section == "📊 Interactive Dashboard":
+    st.header("📊 Explore Donor Dataset")
+    df = load_data()
+    st.subheader("Interactive Data Grid")
+    AgGrid(df, editable=False, fit_columns_on_grid_load=True)
+
+    st.subheader("📈 Plot: Frequency vs Monetary by Target")
+
+# 🎙️ Voice Assistant Tab
+if selected == "🎙️ Voice Assistant":
+    st.header("🎙️ Speak Now: Mic Input with Whisper + GPT")
+
+    # Load Whisper model once
+    @st.cache_resource
+    def load_whisper_model():
+        return whisper.load_model("base")
+
+    model = load_whisper_model()
+
+    class AudioProcessor(AudioProcessorBase):
+        def __init__(self) -> None:
+            self.recording = []
+
+        def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
+            pcm = frame.to_ndarray()
+            self.recording.append(pcm)
+            return frame
+
+    ctx = webrtc_streamer(
+        key="speech",
+        mode="sendonly",
+        audio_processor_factory=AudioProcessor,
+        client_settings=ClientSettings(
+            media_stream_constraints={"audio": True, "video": False},
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+        )
+    )
+
+    if st.button("🔍 Transcribe"):
+        if ctx.audio_processor and ctx.audio_processor.recording:
+            audio = np.concatenate(ctx.audio_processor.recording).astype(np.float32)
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                sf.write(tmp.name, audio, 16000)
+                result = model.transcribe(tmp.name)
+                st.success("🗣 Transcribed text:")
+                st.markdown(f"**{result['text']}**")
+                try:
+                    openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
+                    response = openai.ChatCompletion.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "user", "content": f"You are a DSS bot. Respond to this: {result['text']}"}
+                        ]
+                    )
+                    st.info(response.choices[0].message["content"].strip())
+                except Exception as e:
+                    st.error(f"GPT processing failed: {e}")
+        else:
+            st.warning("No audio recorded yet.")
+
+    fig = px.scatter(df, x='Frequency', y='Monetary', color=df['Target'].map({0:'No',1:'Yes'}))
+    st.plotly_chart(fig, use_container_width=True)
