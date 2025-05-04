@@ -47,7 +47,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Define tab options once
 tabs = [
-    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization", "🔁 What-If Scenario", 
+    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization", 
      "💬 Conversational Chatbot",
     "🎙️ Voice Assistant"
 ]
@@ -637,36 +637,10 @@ elif selected == "💬 Conversational Chatbot":
     user_input = st.text_input("Ask a question about donors, predictions, or campaigns:")
     if user_input:
         response = get_gpt_insight(
-            f"You are a Blood Donation DSS assistant. Respond to: {user_input}"
+            f"You are a data analyst. analyse the dataset in https://github.com/baheldeepti/BloodDonation/blob/main/Balanced_Blood_Donation_Dataset.csv. Respond to: {user_input}"
         )
         st.success(response)
 
-# 🔁 What-If Scenario
-elif selected == "🔁 What-If Scenario":
-    st.header("🔁 Simulate Donor Scenario")
-    rec = st.slider("Recency", 0, 100, 10)
-    freq = st.slider("Frequency", 0, 20, 5)
-    mon = st.slider("Monetary (mL)", 100, 2000, 500)
-    age = st.slider("Age", 18, 65, 35)
-    donor = pd.DataFrame([{
-        "Recency": rec, "Frequency": freq, "Monetary": mon,
-        "Time": 30, "Age": age, "CampaignResponse": 1,
-        "Monetary_per_Freq": mon / (freq + 1),
-        "Intensity": freq / (rec + 1)
-    }])
-
-    st.subheader("Donor Input")
-    st.dataframe(donor)
-
-    if "advanced_models" in st.session_state:
-        model = st.session_state["advanced_models"].get("Voting Ensemble")
-        scaler = st.session_state["scaler"]
-        feats = st.session_state["advanced_features"]
-        X_sim = scaler.transform(donor[feats])
-        prob = model.predict_proba(X_sim)[0][1]
-        st.metric("Predicted Repeat Donation Probability", f"{prob:.2%}")
-    else:
-        st.warning("Model not loaded. Run the Modeling page first.")
 
 
 
