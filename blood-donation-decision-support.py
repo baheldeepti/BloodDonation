@@ -608,7 +608,7 @@ elif selected == "📈 Budget Optimization":
     st.info(get_gpt_insight(ai_prompt))
 
 # 📅 Donation Forecasting
-elif section == "📅 Donation Forecasting":
+elif selected == "📅 Donation Forecasting":
     st.header("📅 Forecasting Monthly Donation Volume")
     df = load_data()
     df['ds'] = pd.date_range(start='2022-01-01', periods=len(df), freq='MS')
@@ -625,7 +625,7 @@ elif section == "📅 Donation Forecasting":
     st.pyplot(fig1)
 
 # 💬 Conversational Chatbot
-elif section == "💬 Conversational Chatbot":
+elif selected == "💬 Conversational Chatbot":
     st.header("💬 AI Assistant Chatbot")
     user_input = st.text_input("Ask a question about donors, predictions, or campaigns:")
     if user_input:
@@ -635,7 +635,7 @@ elif section == "💬 Conversational Chatbot":
         st.success(response)
 
 # 🔁 What-If Scenario
-elif section == "🔁 What-If Scenario":
+elif selected == "🔁 What-If Scenario":
     st.header("🔁 Simulate Donor Scenario")
     rec = st.slider("Recency", 0, 100, 10)
     freq = st.slider("Frequency", 0, 20, 5)
@@ -662,7 +662,7 @@ elif section == "🔁 What-If Scenario":
         st.warning("Model not loaded. Run the Modeling page first.")
 
 # 📊 Interactive Dashboard
-elif section == "📊 Interactive Dashboard":
+elif selected == "📊 Interactive Dashboard":
     st.header("📊 Explore Donor Dataset")
     df = load_data()
     st.subheader("Interactive Data Grid")
