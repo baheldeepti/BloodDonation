@@ -63,7 +63,7 @@ st.session_state.selected_tab = selected
 
 
 # OpenAI insight generator
-@st.cache_data
+
 def get_gpt_insight(prompt: str) -> str:
     openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
     resp = openai.chat.completions.create(
