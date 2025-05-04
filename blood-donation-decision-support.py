@@ -63,25 +63,20 @@ st.session_state.selected_tab = selected
 
 
 # OpenAI insight generator
-from openai import OpenAI
+import openai
 
-try:
-    api_key = st.secrets.get("OPENAI_API_KEY", "")
-except Exception:
-    st.stop()
-    raise ValueError("❌ Missing OPENAI_API_KEY in secrets")
-
-client = OpenAI(api_key=api_key)
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 def get_gpt_insight(prompt: str) -> str:
     try:
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"❌ OpenAI error: {e}"
+
 
 
 
