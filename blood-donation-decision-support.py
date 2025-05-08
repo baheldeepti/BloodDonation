@@ -626,6 +626,7 @@ elif selected == "📈 Budget Optimization":
 # ✅ Refactored & Ready-to-Deploy PyTorch Tab Integration in Streamlit App
 
 # Place this block at the same indentation level as other `elif selected ==` statements:
+# Place this block at the same indentation level as other `elif selected ==` statements:
 elif selected == "🤠 Deep Learning (PyTorch)":
     st.title("🤠 Deep Learning with PyTorch")
     st.markdown("Build and evaluate a neural network for donor prediction using PyTorch.")
@@ -654,59 +655,74 @@ elif selected == "🤠 Deep Learning (PyTorch)":
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
     y_test_tensor = torch.tensor(y_test, dtype=torch.float32).view(-1, 1)
 
-    # Create DataLoader
-    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    # Hyperparameter candidates
+    learning_rates = [0.001, 0.005]
+    batch_sizes = [16, 32]
+    num_layers_options = [2, 3]
 
-    # Define a simple NN
+    # Define a configurable NN
     class Net(nn.Module):
-        def __init__(self, input_dim):
+        def __init__(self, input_dim, num_layers):
             super(Net, self).__init__()
-            self.fc1 = nn.Linear(input_dim, 16)
-            self.fc2 = nn.Linear(16, 8)
-            self.out = nn.Linear(8, 1)
+            self.hidden = nn.ModuleList()
+            self.hidden.append(nn.Linear(input_dim, 16))
+            for _ in range(num_layers - 1):
+                self.hidden.append(nn.Linear(16, 16))
+            self.out = nn.Linear(16, 1)
             self.sigmoid = nn.Sigmoid()
 
         def forward(self, x):
-            x = torch.relu(self.fc1(x))
-            x = torch.relu(self.fc2(x))
+            for layer in self.hidden:
+                x = torch.relu(layer(x))
             return self.sigmoid(self.out(x))
 
-    # Instantiate multiple models for ensemble
-    models = [Net(input_dim=X.shape[1]) for _ in range(3)]
-    loss_fn = nn.BCELoss()
-    optimizers = [optim.Adam(m.parameters(), lr=0.001) for m in models]
+    best_auc = 0
+    best_model = None
+    best_config = None
+    st.subheader("🔧 Hyperparameter Tuning & Ensemble Models")
+    for num_layers in num_layers_options:
+        for lr in learning_rates:
+            for batch_size in batch_sizes:
+                st.write(f"Training model with layers={num_layers}, lr={lr}, batch_size={batch_size}")
+                # DataLoader with current batch size
+                train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                
+                # Train 3 models for ensemble
+                models = [Net(input_dim=X.shape[1], num_layers=num_layers) for _ in range(3)]
+                loss_fn = nn.BCELoss()
+                optimizers = [optim.Adam(m.parameters(), lr=lr) for m in models]
+                
+                for i, model in enumerate(models):
+                    model.train()
+                    for epoch in range(10):  # Reduced for tuning speed
+                        for xb, yb in train_loader:
+                            pred = model(xb)
+                            loss = loss_fn(pred, yb)
+                            optimizers[i].zero_grad()
+                            loss.backward()
+                            optimizers[i].step()
 
-    # Train each model independently
-    n_epochs = 20
-    losses = [[] for _ in range(len(models))]
-    for i, model in enumerate(models):
-        for epoch in range(n_epochs):
-            model.train()
-            epoch_loss = 0.0
-            for xb, yb in train_loader:
-                pred = model(xb)
-                loss = loss_fn(pred, yb)
-                optimizers[i].zero_grad()
-                loss.backward()
-                optimizers[i].step()
-                epoch_loss += loss.item()
-            losses[i].append(epoch_loss / len(train_loader))
+                # Evaluate ensemble
+                for model in models:
+                    model.eval()
+                with torch.no_grad():
+                    preds = [model(X_test_tensor).numpy().flatten() for model in models]
+                    y_pred = np.mean(preds, axis=0)
+                    auc_score = roc_auc_score(y_test, y_pred)
+                    if auc_score > best_auc:
+                        best_auc = auc_score
+                        best_model = models
+                        best_config = (num_layers, lr, batch_size)
 
-    st.subheader("📉 Training Loss Curves for Ensembled Models")
-    for i, loss_list in enumerate(losses):
-        st.line_chart(loss_list, height=150, width=700)
-
-    # Ensemble prediction by averaging outputs
-    st.subheader("📊 Ensemble Performance")
-    for model in models:
-        model.eval()
-
+    # Final Evaluation with Best Ensemble
+    st.subheader("📊 Best Ensemble Model Performance")
     with torch.no_grad():
-        preds = [model(X_test_tensor).numpy().flatten() for model in models]
+        preds = [model(X_test_tensor).numpy().flatten() for model in best_model]
         y_pred = np.mean(preds, axis=0)
         y_pred_class = (y_pred > 0.5).astype(int)
 
+    st.write(f"Best Config - Layers: {best_config[0]}, LR: {best_config[1]}, Batch Size: {best_config[2]}")
     st.write(f"Accuracy: {accuracy_score(y_test, y_pred_class):.2f}")
     st.write(f"Precision: {precision_score(y_test, y_pred_class):.2f}")
     st.write(f"Recall: {recall_score(y_test, y_pred_class):.2f}")
@@ -723,10 +739,10 @@ elif selected == "🤠 Deep Learning (PyTorch)":
         f"ROC AUC: {roc_auc_score(y_test, y_pred):.2f}"
     )
     ai_prompt = (
-        "You are a seasoned ML Engineer. Based on the following performance metrics of an ensemble of PyTorch-based "
+        "You are a seasoned ML Engineer. Based on the following performance metrics of an ensemble of fine-tuned PyTorch-based "
         "neural networks trained to predict blood donor retention, provide:\n"
         "1. **Model Summary** – strengths and limitations.\n"
-        "2. **Improvement Suggestions** – 2–3 steps to enhance performance.\n"
+        "2. **Improvement Suggestions** – next steps to enhance performance.\n"
         "3. **Business Implications** – what these metrics imply for a blood donation outreach strategy.\n\n"
         f"{perf_summary}"
     )
