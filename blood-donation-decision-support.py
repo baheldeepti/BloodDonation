@@ -623,6 +623,9 @@ elif selected == "📈 Budget Optimization":
 
   #Deep Learning using Pytorch
 
+# ✅ Refactored & Ready-to-Deploy PyTorch Tab Integration in Streamlit App
+
+# Place this block at the same indentation level as other `elif selected ==` statements:
 elif selected == "🤠 Deep Learning (PyTorch)":
     st.title("🤠 Deep Learning with PyTorch")
     st.markdown("Build and evaluate a neural network for donor prediction using PyTorch.")
@@ -669,35 +672,41 @@ elif selected == "🤠 Deep Learning (PyTorch)":
             x = torch.relu(self.fc2(x))
             return self.sigmoid(self.out(x))
 
-    model = Net(input_dim=X.shape[1])
+    # Instantiate multiple models for ensemble
+    models = [Net(input_dim=X.shape[1]) for _ in range(3)]
     loss_fn = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizers = [optim.Adam(m.parameters(), lr=0.001) for m in models]
 
-    # Train
+    # Train each model independently
     n_epochs = 20
-    losses = []
-    for epoch in range(n_epochs):
-        model.train()
-        epoch_loss = 0.0
-        for xb, yb in train_loader:
-            pred = model(xb)
-            loss = loss_fn(pred, yb)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item()
-        losses.append(epoch_loss / len(train_loader))
+    losses = [[] for _ in range(len(models))]
+    for i, model in enumerate(models):
+        for epoch in range(n_epochs):
+            model.train()
+            epoch_loss = 0.0
+            for xb, yb in train_loader:
+                pred = model(xb)
+                loss = loss_fn(pred, yb)
+                optimizers[i].zero_grad()
+                loss.backward()
+                optimizers[i].step()
+                epoch_loss += loss.item()
+            losses[i].append(epoch_loss / len(train_loader))
 
-    st.subheader("📉 Training Loss Curve")
-    st.line_chart(losses)
+    st.subheader("📉 Training Loss Curves for Ensembled Models")
+    for i, loss_list in enumerate(losses):
+        st.line_chart(loss_list, height=150, width=700)
 
-    # Evaluate
-    model.eval()
+    # Ensemble prediction by averaging outputs
+    st.subheader("📊 Ensemble Performance")
+    for model in models:
+        model.eval()
+
     with torch.no_grad():
-        y_pred = model(X_test_tensor).numpy().flatten()
+        preds = [model(X_test_tensor).numpy().flatten() for model in models]
+        y_pred = np.mean(preds, axis=0)
         y_pred_class = (y_pred > 0.5).astype(int)
 
-    st.subheader("📋 Model Performance")
     st.write(f"Accuracy: {accuracy_score(y_test, y_pred_class):.2f}")
     st.write(f"Precision: {precision_score(y_test, y_pred_class):.2f}")
     st.write(f"Recall: {recall_score(y_test, y_pred_class):.2f}")
@@ -714,8 +723,8 @@ elif selected == "🤠 Deep Learning (PyTorch)":
         f"ROC AUC: {roc_auc_score(y_test, y_pred):.2f}"
     )
     ai_prompt = (
-        "You are a seasoned ML Engineer. Based on the following performance metrics of a PyTorch-based "
-        "neural network trained to predict blood donor retention, provide:\n"
+        "You are a seasoned ML Engineer. Based on the following performance metrics of an ensemble of PyTorch-based "
+        "neural networks trained to predict blood donor retention, provide:\n"
         "1. **Model Summary** – strengths and limitations.\n"
         "2. **Improvement Suggestions** – 2–3 steps to enhance performance.\n"
         "3. **Business Implications** – what these metrics imply for a blood donation outreach strategy.\n\n"
