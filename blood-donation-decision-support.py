@@ -35,6 +35,11 @@ from catboost import CatBoostClassifier
 import plotly.express as px
 import openai
 from pulp import LpProblem, LpVariable, LpMaximize, lpSum, LpBinary
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+
 
 import soundfile as sf
 
@@ -47,8 +52,10 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 
 # Define tab options once
 tabs = [
-    "🏠 Overview", "📊 Exploratory Analysis","🤖 Modeling & Recommendations", "📈 Budget Optimization"
+    "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations",
+    "📈 Budget Optimization", "🧠 Deep Learning (PyTorch)"
 ]
+
 
 # Safely get the index for the default tab
 default_index = tabs.index(st.session_state.get("selected_tab", "🏠 Overview"))
@@ -612,86 +619,106 @@ elif selected == "📈 Budget Optimization":
     )
     st.info(get_gpt_insight(ai_prompt))
 
-# 📅 Donation Forecasting
-elif selected == "📅 Donation Forecasting":
-    st.header("📅 Forecasting Monthly Donation Volume")
-    df = load_data()
-    df['ds'] = pd.date_range(start='2022-01-01', periods=len(df), freq='MS')
-    monthly = df.groupby(df['ds'].dt.to_period("M"))['Monetary'].sum().reset_index()
-    monthly.columns = ['ds', 'y']
-    monthly['ds'] = monthly['ds'].dt.to_timestamp()
-
-    model = Prophet()
-    model.fit(monthly)
-    future = model.make_future_dataframe(periods=6, freq='M')
-    forecast = model.predict(future)
-
-    fig1 = model.plot(forecast)
-    st.pyplot(fig1)
-
-# 💬 Conversational Chatbot
-elif selected == "💬 Conversational Chatbot":
-    st.header("💬 AI Assistant Chatbot")
-    user_input = st.text_input("Ask a question about donors, predictions, or campaigns:")
-    if user_input:
-        response = get_gpt_insight(
-            f"You are a data analyst. analyse the dataset in https://github.com/baheldeepti/BloodDonation/blob/main/Balanced_Blood_Donation_Dataset.csv. Respond to: {user_input}"
-        )
-        st.success(response)
 
 
+  #Deep Learning using Pytorch
 
+elif selected == "🤠 Deep Learning (PyTorch)":
+    st.title("🤠 Deep Learning with PyTorch")
+    st.markdown("Build and evaluate a neural network for donor prediction using PyTorch.")
 
+    # Load data
+    url = "https://raw.githubusercontent.com/baheldeepti/BloodDonation/main/Balanced_Blood_Donation_Dataset.csv"
+    df = pd.read_csv(url)
 
+    # Feature Engineering
+    df['Monetary_per_Freq'] = df['Monetary'] / (df['Frequency'] + 1)
+    df['Intensity'] = df['Frequency'] / (df['Recency'] + 1)
 
+    features = ['Recency', 'Frequency', 'Monetary', 'Time', 'Age', 'CampaignResponse', 'Monetary_per_Freq', 'Intensity']
+    X = df[features].values
+    y = df['Target'].values
 
-# Voice Assistant Tab
-elif selected == "🎧 Voice Assistant":
-    st.header("🎧 Speak Now: Mic Input with Whisper + GPT")
+    # Train/Test Split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    scaler = StandardScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
 
-    @st.cache_resource
-    def load_whisper_model():
-        return whisper.load_model("base")
+    # Convert to PyTorch tensors
+    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+    y_train_tensor = torch.tensor(y_train, dtype=torch.float32).view(-1, 1)
+    X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+    y_test_tensor = torch.tensor(y_test, dtype=torch.float32).view(-1, 1)
 
-    model = load_whisper_model()
+    # Create DataLoader
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    class AudioProcessor(AudioProcessorBase):
-        def __init__(self) -> None:
-            self.recording = []
+    # Define a simple NN
+    class Net(nn.Module):
+        def __init__(self, input_dim):
+            super(Net, self).__init__()
+            self.fc1 = nn.Linear(input_dim, 16)
+            self.fc2 = nn.Linear(16, 8)
+            self.out = nn.Linear(8, 1)
+            self.sigmoid = nn.Sigmoid()
 
-        def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-            pcm = frame.to_ndarray()
-            self.recording.append(pcm)
-            return frame
+        def forward(self, x):
+            x = torch.relu(self.fc1(x))
+            x = torch.relu(self.fc2(x))
+            return self.sigmoid(self.out(x))
 
-    ctx = webrtc_streamer(
-        key="speech",
-        mode="sendonly",
-        audio_processor_factory=AudioProcessor,
-        client_settings=ClientSettings(
-            media_stream_constraints={"audio": True, "video": False},
-            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-        )
+    model = Net(input_dim=X.shape[1])
+    loss_fn = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    # Train
+    n_epochs = 20
+    losses = []
+    for epoch in range(n_epochs):
+        model.train()
+        epoch_loss = 0.0
+        for xb, yb in train_loader:
+            pred = model(xb)
+            loss = loss_fn(pred, yb)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+        losses.append(epoch_loss / len(train_loader))
+
+    st.subheader("📉 Training Loss Curve")
+    st.line_chart(losses)
+
+    # Evaluate
+    model.eval()
+    with torch.no_grad():
+        y_pred = model(X_test_tensor).numpy().flatten()
+        y_pred_class = (y_pred > 0.5).astype(int)
+
+    st.subheader("📋 Model Performance")
+    st.write(f"Accuracy: {accuracy_score(y_test, y_pred_class):.2f}")
+    st.write(f"Precision: {precision_score(y_test, y_pred_class):.2f}")
+    st.write(f"Recall: {recall_score(y_test, y_pred_class):.2f}")
+    st.write(f"F1 Score: {f1_score(y_test, y_pred_class):.2f}")
+    st.write(f"ROC AUC: {roc_auc_score(y_test, y_pred):.2f}")
+
+    # AI-Generated Insights
+    st.subheader("🤖 AI-Generated Insights")
+    perf_summary = (
+        f"Model Accuracy: {accuracy_score(y_test, y_pred_class):.2f}\n"
+        f"Precision: {precision_score(y_test, y_pred_class):.2f}\n"
+        f"Recall: {recall_score(y_test, y_pred_class):.2f}\n"
+        f"F1 Score: {f1_score(y_test, y_pred_class):.2f}\n"
+        f"ROC AUC: {roc_auc_score(y_test, y_pred):.2f}"
     )
-
-    if st.button("🔍 Transcribe"):
-        if ctx.audio_processor and ctx.audio_processor.recording:
-            audio = np.concatenate(ctx.audio_processor.recording).astype(np.float32)
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-                sf.write(tmp.name, audio, 16000)
-                result = model.transcribe(tmp.name)
-                st.success("🗣 Transcribed text:")
-                st.markdown(f"**{result['text']}**")
-                try:
-                    openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {"role": "user", "content": f"You are a DSS bot. Respond to this: {result['text']}"}
-                        ]
-                    )
-                    st.info(response.choices[0].message["content"].strip())
-                except Exception as e:
-                    st.error(f"GPT processing failed: {e}")
-        else:
-            st.warning("No audio recorded yet.")
+    ai_prompt = (
+        "You are a seasoned ML Engineer. Based on the following performance metrics of a PyTorch-based "
+        "neural network trained to predict blood donor retention, provide:\n"
+        "1. **Model Summary** – strengths and limitations.\n"
+        "2. **Improvement Suggestions** – 2–3 steps to enhance performance.\n"
+        "3. **Business Implications** – what these metrics imply for a blood donation outreach strategy.\n\n"
+        f"{perf_summary}"
+    )
+    st.info(get_gpt_insight(ai_prompt))
