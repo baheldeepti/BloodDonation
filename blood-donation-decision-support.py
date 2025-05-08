@@ -53,7 +53,7 @@ st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
 # Define tab options once
 tabs = [
     "🏠 Overview", "📊 Exploratory Analysis", "🤖 Modeling & Recommendations",
-    "📈 Budget Optimization", "🧠 Deep Learning (PyTorch)"
+    "📈 Budget Optimization", "🤠 Deep Learning (PyTorch)"
 ]
 
 
