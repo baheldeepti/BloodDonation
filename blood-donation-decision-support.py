@@ -4,9 +4,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import whisper
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, ClientSettings
-import av
 import tempfile
 from prophet import Prophet
 from st_aggrid import AgGrid
@@ -40,8 +37,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
-
-import soundfile as sf
 
 # Streamlit page configuration
 st.set_page_config(page_title="🩸 Blood Donation DSS", layout="wide")
