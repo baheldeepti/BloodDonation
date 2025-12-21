@@ -11,4 +11,7 @@ xgboost==1.7.6
 catboost==1.2.3            
 plotly==5.20.0            
 pulp==2.8                  
+prophet==1.1.4
+cmdstanpy==1.2.2
+holidays==0.36
 
